@@ -9,11 +9,8 @@ const PORT = process.env.PORT || 3000;
 
 // ─── PostgreSQL Connection ────────────────────────────────────────
 const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'mapmyhealth',
-  password: '***REMOVED***',
-  port: 5432,
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
 // ─── Middleware ───────────────────────────────────────────────────
