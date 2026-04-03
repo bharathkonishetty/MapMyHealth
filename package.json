@@ -1,0 +1,16 @@
+{
+  "name": "beginner-fit",
+  "version": "1.0.0",
+  "description": "BeginnerFit - MapMyHealth Fitness App",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "pg": "^8.20.0"
+  }
+}

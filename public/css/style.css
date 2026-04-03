@@ -1,0 +1,548 @@
+/* ─── CSS Variables ─────────────────────────────────────────────── */
+:root {
+  --neon-blue: #00f2fe;
+  --neon-purple: #4facfe;
+  --gold: #FFD700;
+  --dark-bg: #0f0c29;
+  --card-bg: rgba(255,255,255,0.08);
+  --card-border: rgba(255,255,255,0.12);
+  --green: #2ecc71;
+  --red: #e74c3c;
+}
+ 
+/* ─── Reset & Base ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+ 
+body, html {
+  margin: 0; padding: 0;
+  min-height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: white;
+  background: transparent;
+  overflow-x: hidden;
+}
+ 
+/* ─── Animated Background ───────────────────────────────────────── */
+.bg-overlay {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  background-image: url('/gym.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: -1;
+  opacity: 1.0;
+}
+ 
+/* ─── Utility ───────────────────────────────────────────────────── */
+.hidden { display: none !important; }
+ 
+/* ─── Auth Section ──────────────────────────────────────────────── */
+#auth-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+ 
+.form-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(15px);
+  padding: 32px 28px;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 0 40px rgba(0,0,0,0.5);
+  border: 1px solid var(--card-border);
+}
+ 
+.form-card h2 {
+  text-align: center;
+  margin: 0 0 20px;
+  font-size: 1.6rem;
+  background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+ 
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="number"] {
+  width: 100%;
+  padding: 11px 14px;
+  margin: 6px 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.12);
+  color: white;
+  font-size: 14px;
+  transition: border 0.3s;
+}
+ 
+input:focus {
+  outline: none;
+  border-color: var(--neon-blue);
+  background: rgba(0,242,254,0.08);
+}
+ 
+input::placeholder { color: rgba(255,255,255,0.5); }
+ 
+.pass-hint {
+  font-size: 10px;
+  color: rgba(255,255,255,0.55);
+  margin: -3px 0 6px;
+  line-height: 1.6;
+}
+ 
+.btn-main {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple));
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  font-size: 14px;
+  color: #0f0c29;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: opacity 0.3s, transform 0.2s;
+}
+ 
+.btn-main:hover { opacity: 0.88; transform: translateY(-1px); }
+ 
+.toggle-link {
+  text-align: center;
+  margin-top: 12px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.65);
+}
+ 
+.toggle-link a { color: var(--neon-blue); cursor: pointer; text-decoration: none; }
+.toggle-link a:hover { text-decoration: underline; }
+ 
+.msg { font-size: 13px; text-align: center; margin-top: 8px; min-height: 18px; }
+.msg.error { color: #ff6b81; }
+.msg.success { color: var(--green); }
+ 
+/* ─── Dashboard ─────────────────────────────────────────────────── */
+#dashboard { display: none; padding: 20px; }
+ 
+/* ─── Profile Trigger (top-right) ──────────────────────────────── */
+.profile-trigger {
+  position: fixed; top: 16px; right: 16px;
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple));
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  border: 2px solid rgba(255,255,255,0.3);
+  z-index: 200;
+  font-size: 18px;
+  transition: transform 0.2s;
+}
+ 
+.profile-trigger:hover { transform: scale(1.08); }
+ 
+/* ─── Profile Modal ─────────────────────────────────────────────── */
+.profile-modal {
+  display: none;
+  position: fixed; top: 78px; right: 16px;
+  background: #1e1b4b;
+  color: white;
+  padding: 22px;
+  border-radius: 16px;
+  width: 270px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+  border: 1px solid rgba(79,172,254,0.3);
+  z-index: 199;
+}
+ 
+.profile-modal h3 { margin: 0 0 4px; color: var(--neon-blue); font-size: 1.1rem; }
+.profile-modal .p-sub { font-size: 12px; color: rgba(255,255,255,0.6); margin: 2px 0 14px; }
+.profile-modal hr { border-color: rgba(255,255,255,0.12); margin: 14px 0; }
+.profile-modal label { font-size: 11px; color: rgba(255,255,255,0.6); display: block; margin-top: 8px; }
+.profile-modal input { color: white; font-size: 13px; }
+ 
+.btn-logout {
+  width: 100%;
+  padding: 10px;
+  background: var(--red);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 14px;
+  transition: opacity 0.3s;
+}
+ 
+.btn-logout:hover { opacity: 0.85; }
+ 
+.btn-save-profile {
+  width: 100%;
+  padding: 9px;
+  background: linear-gradient(135deg, #00f2fe, #4facfe);
+  border: none;
+  border-radius: 8px;
+  color: #0f0c29;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 8px;
+  font-size: 13px;
+}
+ 
+/* ─── Nav Tabs ──────────────────────────────────────────────────── */
+.nav-tabs {
+  display: flex;
+  gap: 8px;
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  flex-wrap: wrap;
+  justify-content: center;
+  background: rgba(15, 12, 41, 0.92);
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(10px);
+  max-width: calc(100vw - 100px);
+}
+ 
+.nav-tab {
+  padding: 8px 16px;
+  border: 2px solid var(--gold);
+  border-radius: 8px;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  font-weight: 800;
+  transition: 0.25s;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+ 
+.nav-tab.active, .nav-tab:hover {
+  background: var(--gold);
+  color: #0f0c29;
+}
+ 
+/* ─── Section Content ───────────────────────────────────────────── */
+.section-content { display: none; margin-top: 90px; }
+.section-content.active { display: block; }
+ 
+/* ─── Day Dropdown ──────────────────────────────────────────────── */
+.day-dropdown {
+  display: flex;
+  justify-content: center;
+  padding: 30px 20px 10px;
+}
+ 
+.day-dropdown select {
+  padding: 11px 18px;
+  font-size: 15px;
+  border: 2px solid var(--gold);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.07);
+  color: white;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.3s;
+}
+ 
+.day-dropdown select option { background: #0f0c29; color: white; }
+.day-dropdown select:focus { outline: none; background: var(--gold); color: #0f0c29; }
+ 
+/* ─── Day Info Label ─────────────────────────────────────────────── */
+#day-info {
+  text-align: center;
+  color: var(--gold);
+  font-weight: bold;
+  font-size: 17px;
+  margin: 8px 0;
+  letter-spacing: 0.5px;
+}
+ 
+/* ─── Workout Grid ──────────────────────────────────────────────── */
+.workout-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px;
+}
+ 
+.muscle-btn {
+  width: 92px; height: 92px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.05);
+  border: 2px solid var(--neon-blue);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.35s;
+  font-size: 0.72rem;
+  font-weight: 600;
+  gap: 5px;
+  color: white;
+  user-select: none;
+}
+ 
+.muscle-btn i { font-size: 1.2rem; color: var(--neon-blue); }
+.muscle-btn:hover { background: var(--neon-blue); color: #0f0c29; transform: scale(1.1); }
+.muscle-btn:hover i { color: #0f0c29; }
+ 
+/* ─── Exercise Popup ─────────────────────────────────────────────── */
+#screen-overlay {
+  display: none;
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.82);
+  z-index: 300;
+}
+ 
+#exercise-view {
+  display: none;
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 92%;
+  max-width: 620px;
+  max-height: 86vh;
+  background: #12112a;
+  padding: 24px;
+  border-radius: 20px;
+  border: 2px solid var(--neon-blue);
+  z-index: 400;
+  overflow-y: auto;
+}
+ 
+#ex-title {
+  color: var(--neon-blue);
+  text-align: center;
+  margin: 0 0 16px;
+  font-size: 1.3rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+ 
+.exercise-item {
+  background: #1c1b33;
+  margin-bottom: 18px;
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+}
+ 
+.exercise-item h4 {
+  margin: 0 0 10px;
+  color: var(--neon-blue);
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  letter-spacing: 0.5px;
+}
+ 
+.exercise-item .video-wrap {
+  position: relative;
+  padding-top: 56.25%;
+  border-radius: 8px;
+  overflow: hidden;
+}
+ 
+.exercise-item .video-wrap iframe {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%;
+  border: none;
+}
+ 
+.exercise-item video, .exercise-item img {
+  width: 100%;
+  border-radius: 8px;
+  max-height: 280px;
+  object-fit: cover;
+}
+ 
+/* ─── Diet Section ───────────────────────────────────────────────── */
+.content-section {
+  padding: 24px 20px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+ 
+.content-section h2 {
+  color: var(--gold);
+  text-align: center;
+  margin-bottom: 24px;
+  font-size: 1.5rem;
+}
+ 
+.meal-category {
+  margin-bottom: 28px;
+  background: var(--card-bg);
+  padding: 20px;
+  border-radius: 14px;
+  border-left: 4px solid var(--gold);
+}
+ 
+.meal-category h3 {
+  color: var(--gold);
+  margin-top: 0;
+  font-size: 1rem;
+}
+ 
+.meal-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+  font-size: 13px;
+}
+ 
+.meal-table thead { background: rgba(255,215,0,0.12); }
+ 
+.meal-table th, .meal-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255,215,0,0.2);
+}
+ 
+.meal-table th { color: var(--gold); font-weight: 700; }
+.meal-table tr:hover { background: rgba(255,215,0,0.07); }
+ 
+.veg-badge {
+  background: var(--green);
+  color: white;
+  padding: 3px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: bold;
+}
+ 
+.nonveg-badge {
+  background: var(--red);
+  color: white;
+  padding: 3px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: bold;
+}
+ 
+.day-total {
+  color: var(--neon-blue);
+  margin-top: 10px;
+  font-size: 13px;
+}
+ 
+/* ─── Info Boxes ─────────────────────────────────────────────────── */
+.info-box {
+  background: var(--card-bg);
+  padding: 20px;
+  border-radius: 14px;
+  border-left: 4px solid var(--gold);
+  margin-bottom: 22px;
+  line-height: 1.8;
+}
+ 
+.info-box h3 {
+  color: var(--gold);
+  margin-top: 0;
+  font-size: 1rem;
+}
+ 
+.info-box p { margin: 6px 0; font-size: 14px; color: rgba(255,255,255,0.85); }
+.info-box a { color: var(--neon-blue); }
+ 
+/* ─── Trainer Cards ──────────────────────────────────────────────── */
+.trainer-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+ 
+.trainer-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(79,172,254,0.25);
+  border-radius: 16px;
+  padding: 22px 20px;
+  width: 260px;
+  text-align: center;
+  transition: transform 0.3s, border-color 0.3s;
+}
+ 
+.trainer-card:hover { transform: translateY(-4px); border-color: var(--neon-blue); }
+ 
+.trainer-avatar {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple));
+  margin: 0 auto 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+}
+ 
+.trainer-card h4 { color: var(--neon-blue); margin: 0 0 6px; }
+.trainer-card p { font-size: 13px; color: rgba(255,255,255,0.7); margin: 3px 0; }
+ 
+.btn-book {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 9px 22px;
+  background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple));
+  border: none;
+  border-radius: 8px;
+  color: #0f0c29;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 13px;
+  transition: opacity 0.3s;
+}
+ 
+.btn-book:hover { opacity: 0.85; }
+ 
+/* ─── Toast Notification ─────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: 28px; left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: #1e1b4b;
+  border: 1px solid rgba(0,242,254,0.4);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-size: 14px;
+  z-index: 999;
+  opacity: 0;
+  transition: all 0.4s ease;
+  pointer-events: none;
+  white-space: nowrap;
+}
+ 
+#toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+ 
+/* ─── Scrollbar ──────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #0f0c29; }
+::-webkit-scrollbar-thumb { background: rgba(0,242,254,0.4); border-radius: 10px; }
+ 
+/* ─── Responsive ─────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .nav-tabs { gap: 5px; padding: 7px; max-width: calc(100vw - 90px); }
+  .nav-tab { padding: 7px 11px; font-size: 10px; }
+  .meal-table { font-size: 11px; }
+  .meal-table th, .meal-table td { padding: 7px 8px; }
+  .trainer-card { width: 100%; max-width: 320px; }
+}
+ 
