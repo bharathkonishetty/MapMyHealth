@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BeginnerFit — MapMyHealth</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+ 
+  <div class="bg-overlay"></div>
+  <div id="screen-overlay" onclick="closeEx()"></div>
+  <div id="toast"></div>
+ 
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!--  AUTH SECTION                                          -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div id="auth-section">
+ 
+    <!-- REGISTER FORM -->
+    <div id="reg-form" class="form-card">
+      <h2>Create Account</h2>
+ 
+      <input type="text"     id="reg-name"   placeholder="Username (e.g. JohnDoe)" required>
+      <input type="email"    id="reg-email"  placeholder="Gmail address" required>
+      <input type="tel"      id="reg-mobile" maxlength="10" placeholder="Mobile (10 digits)" required>
+      <input type="password" id="reg-pass"   placeholder="Create Password" required>
+      <small class="pass-hint">
+        Min 6 chars · 1 uppercase · 1 lowercase · 1 digit · exactly 1 special char
+      </small>
+      <input type="password" id="reg-repass" placeholder="Confirm Password" required>
+ 
+      <button class="btn-main" onclick="register()">Sign Up</button>
+      <p id="reg-msg" class="msg"></p>
+      <p class="toggle-link">Already a member? <a onclick="toggleAuth()">Login here</a></p>
+    </div>
+ 
+    <!-- LOGIN FORM -->
+    <div id="login-form" class="form-card hidden">
+      <h2>Welcome Back</h2>
+ 
+      <input type="text"     id="log-id"   placeholder="Username or Gmail" required>
+      <input type="password" id="log-pass" placeholder="Password" required>
+ 
+      <button class="btn-main" onclick="login()">Enter Dashboard</button>
+      <p id="login-msg" class="msg"></p>
+      <p class="toggle-link">New here? <a onclick="toggleAuth()">Create account</a></p>
+    </div>
+ 
+  </div><!-- /auth-section -->
+ 
+ 
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!--  DASHBOARD                                             -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div id="dashboard">
+ 
+    <!-- Profile Icon -->
+    <div class="profile-trigger" onclick="toggleProfile()" title="Profile">
+      <i class="fas fa-user"></i>
+    </div>
+ 
+    <!-- Profile Modal -->
+    <div id="profile-modal" class="profile-modal">
+      <h3 id="p-name">User</h3>
+      <p class="p-sub" id="p-email"></p>
+      <p class="p-sub" id="p-mobile"></p>
+      <hr>
+      <label>Age</label>
+      <input type="number" id="u-age" placeholder="e.g. 22" min="10" max="80">
+      <label>Height (cm)</label>
+      <input type="number" id="u-height" placeholder="e.g. 175" min="100" max="250">
+      <label>Weight (kg)</label>
+      <input type="number" id="u-weight" placeholder="e.g. 70" min="30" max="200">
+      <button class="btn-save-profile" onclick="saveProfile()">Save Stats</button>
+      <button class="btn-logout" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+    </div>
+ 
+    <!-- Navigation Tabs -->
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchSection('workouts', this)">WORKOUTS</button>
+      <button class="nav-tab"        onclick="switchSection('diet', this)">DIET</button>
+      <button class="nav-tab"        onclick="switchSection('about', this)">ABOUT</button>
+      <button class="nav-tab"        onclick="switchSection('help', this)">HELP</button>
+      <button class="nav-tab"        onclick="switchSection('trainer', this)">TRAINER</button>
+    </div>
+ 
+ 
+    <!-- ─── WORKOUTS SECTION ─────────────────────────────── -->
+    <div id="workouts" class="section-content active">
+      <div class="day-dropdown">
+        <select onchange="selectDay(this.value)">
+          <option value="">— Select Workout Day —</option>
+          <option value="Monday">Monday · Chest</option>
+          <option value="Tuesday">Tuesday · Back</option>
+          <option value="Wednesday">Wednesday · Shoulders</option>
+          <option value="Thursday">Thursday · Biceps</option>
+          <option value="Friday">Friday · Triceps</option>
+          <option value="Saturday">Saturday · Legs</option>
+          <option value="Sunday">Sunday · Full Body</option>
+        </select>
+      </div>
+ 
+      <div id="day-info" style="display:none;"></div>
+ 
+      <div id="workout-grid" class="workout-grid" style="display:none;">
+        <div class="muscle-btn" onclick="openExercise('Chest')">
+          <i class="fas fa-dumbbell"></i><span>CHEST</span>
+        </div>
+        <div class="muscle-btn" onclick="openExercise('Shoulders')">
+          <i class="fas fa-arrows-up-down"></i><span>SHOULDERS</span>
+        </div>
+        <div class="muscle-btn" onclick="openExercise('Back')">
+          <i class="fas fa-person"></i><span>BACK</span>
+        </div>
+        <div class="muscle-btn" onclick="openExercise('Biceps')">
+          <i class="fas fa-hand-fist"></i><span>BICEPS</span>
+        </div>
+        <div class="muscle-btn" onclick="openExercise('Legs')">
+          <i class="fas fa-person-running"></i><span>LEGS</span>
+        </div>
+        <div class="muscle-btn" onclick="openExercise('Triceps')">
+          <i class="fas fa-hand-back-fist"></i><span>TRICEPS</span>
+        </div>
+      </div>
+    </div><!-- /workouts -->
+ 
+ 
+    <!-- ─── DIET SECTION ─────────────────────────────────── -->
+    <div id="diet" class="section-content">
+      <div class="content-section">
+        <h2>7-Day Workout-Specific Meal Plan</h2>
+ 
+        <!-- MONDAY - CHEST -->
+        <div class="meal-category">
+          <h3>🏋️ MONDAY — CHEST DAY (High Carbs &amp; Protein)</h3>
+          <table class="meal-table">
+            <thead><tr><th>Meal Time</th><th>Item</th><th>Type</th><th>Cal</th><th>Protein</th><th>Carbs</th></tr></thead>
+            <tbody>
+              <tr><td>Breakfast (7 AM)</td><td>Oatmeal with Honey &amp; Banana</td><td><span class="veg-badge">VEG</span></td><td>280</td><td>10g</td><td>52g</td></tr>
+              <tr><td>Breakfast</td><td>Egg White Omelette (3 eggs)</td><td><span class="nonveg-badge">NON-VEG</span></td><td>150</td><td>26g</td><td>2g</td></tr>
+              <tr><td>Snack (10 AM)</td><td>Protein Shake + Almonds</td><td><span class="nonveg-badge">NON-VEG</span></td><td>220</td><td>28g</td><td>15g</td></tr>
+              <tr><td>Lunch (1 PM)</td><td>Grilled Chicken Breast (180g)</td><td><span class="nonveg-badge">NON-VEG</span></td><td>300</td><td>52g</td><td>0g</td></tr>
+              <tr><td>Lunch</td><td>Basmati Rice (1.5 cups)</td><td><span class="veg-badge">VEG</span></td><td>320</td><td>7g</td><td>68g</td></tr>
+              <tr><td>Lunch</td><td>Steamed Vegetables</td><td><span class="veg-badge">VEG</span></td><td>60</td><td>4g</td><td>12g</td></tr>
+              <tr><td>Pre-Workout (4 PM)</td><td>Banana + Peanut Butter</td><td><span class="veg-badge">VEG</span></td><td>200</td><td>8g</td><td>28g</td></tr>
+              <tr><td>Post-Workout (6:30 PM)</td><td>Whey Protein + Dextrose</td><td><span class="nonveg-badge">NON-VEG</span></td><td>180</td><td>30g</td><td>20g</td></tr>
+              <tr><td>Dinner (8 PM)</td><td>Paneer Tikka (150g)</td><td><span class="veg-badge">VEG</span></td><td>280</td><td>22g</td><td>8g</td></tr>
+              <tr><td>Dinner</td><td>Whole Wheat Chapati (2)</td><td><span class="veg-badge">VEG</span></td><td>180</td><td>6g</td><td>36g</td></tr>
+            </tbody>
+          </table>
+          <p class="day-total"><strong>Daily Total: 2170 Cal | 193g Protein | 241g Carbs</strong></p>
+        </div>
+ 
+        <!-- TUESDAY - BACK -->
+        <div class="meal-category">
+          <h3>💪 TUESDAY — BACK DAY (High Protein)</h3>
+          <table class="meal-table">
+            <thead><tr><th>Meal Time</th><th>Item</th><th>Type</th><th>Cal</th><th>Protein</th><th>Carbs</th></tr></thead>
+            <tbody>
+              <tr><td>Breakfast (7 AM)</td><td>Greek Yogurt + Berries</td><td><span class="nonveg-badge">NON-VEG</span></td><td>220</td><td>20g</td><td>28g</td></tr>
+              <tr><td>Breakfast</td><td>Boiled Eggs (3)</td><td><span class="nonveg-badge">NON-VEG</span></td><td>210</td><td>18g</td><td>2g</td></tr>
+              <tr><td>Snack (10 AM)</td><td>Cottage Cheese + Fruits</td><td><span class="nonveg-badge">NON-VEG</span></td><td>180</td><td>18g</td><td>20g</td></tr>
+              <tr><td>Lunch (1 PM)</td><td>Tuna Salad (200g)</td><td><span class="nonveg-badge">NON-VEG</span></td><td>250</td><td>40g</td><td>5g</td></tr>
+              <tr><td>Lunch</td><td>Brown Rice (1 cup)</td><td><span class="veg-badge">VEG</span></td><td>220</td><td>5g</td><td>46g</td></tr>
+              <tr><td>Pre-Workout (4 PM)</td><td>Oats + Milk</td><td><span class="nonveg-badge">NON-VEG</span></td><td>250</td><td>12g</td><td>40g</td></tr>
+              <tr><td>Post-Workout (6:30 PM)</td><td>Whey Protein Shake</td><td><span class="nonveg-badge">NON-VEG</span></td><td>150</td><td>30g</td><td>5g</td></tr>
+              <tr><td>Dinner (8 PM)</td><td>Salmon Fillet (150g) + Salad</td><td><span class="nonveg-badge">NON-VEG</span></td><td>320</td><td>40g</td><td>4g</td></tr>
+            </tbody>
+          </table>
+          <p class="day-total"><strong>Daily Total: 1800 Cal | 183g Protein | 150g Carbs</strong></p>
+        </div>
+ 
+        <!-- WEDNESDAY - SHOULDERS -->
+        <div class="meal-category">
+          <h3>🔝 WEDNESDAY — SHOULDERS DAY (Balanced Macros)</h3>
+          <table class="meal-table">
+            <thead><tr><th>Meal Time</th><th>Item</th><th>Type</th><th>Cal</th><th>Protein</th><th>Carbs</th></tr></thead>
+            <tbody>
+              <tr><td>Breakfast (7 AM)</td><td>Idli (4) + Sambar</td><td><span class="veg-badge">VEG</span></td><td>280</td><td>10g</td><td>55g</td></tr>
+              <tr><td>Snack (10 AM)</td><td>Mixed Nuts + Banana</td><td><span class="veg-badge">VEG</span></td><td>250</td><td>7g</td><td>35g</td></tr>
+              <tr><td>Lunch (1 PM)</td><td>Chicken Curry (150g)</td><td><span class="nonveg-badge">NON-VEG</span></td><td>300</td><td>38g</td><td>8g</td></tr>
+              <tr><td>Lunch</td><td>Jeera Rice (1 cup)</td><td><span class="veg-badge">VEG</span></td><td>220</td><td>5g</td><td>46g</td></tr>
+              <tr><td>Pre-Workout (4 PM)</td><td>Sweet Potato (1 medium)</td><td><span class="veg-badge">VEG</span></td><td>180</td><td>4g</td><td>42g</td></tr>
+              <tr><td>Post-Workout (6:30 PM)</td><td>Protein Shake + Banana</td><td><span class="nonveg-badge">NON-VEG</span></td><td>220</td><td>28g</td><td>30g</td></tr>
+              <tr><td>Dinner (8 PM)</td><td>Dal Tadka + 2 Rotis</td><td><span class="veg-badge">VEG</span></td><td>350</td><td>16g</td><td>55g</td></tr>
+            </tbody>
+          </table>
+          <p class="day-total"><strong>Daily Total: 1800 Cal | 108g Protein | 271g Carbs</strong></p>
+        </div>
+ 
+        <!-- THURSDAY - BICEPS -->
+        <div class="meal-category">
+          <h3>💪 THURSDAY — BICEPS DAY (Protein Emphasis)</h3>
+          <table class="meal-table">
+            <thead><tr><th>Meal Time</th><th>Item</th><th>Type</th><th>Cal</th><th>Protein</th><th>Carbs</th></tr></thead>
+            <tbody>
+              <tr><td>Breakfast (7 AM)</td><td>Egg Bhurji (4 eggs) + Toast</td><td><span class="nonveg-badge">NON-VEG</span></td><td>320</td><td>28g</td><td>30g</td></tr>
+              <tr><td>Snack (10 AM)</td><td>Protein Bar + Apple</td><td><span class="nonveg-badge">NON-VEG</span></td><td>250</td><td>20g</td><td>30g</td></tr>
+              <tr><td>Lunch (1 PM)</td><td>Grilled Fish (200g)</td><td><span class="nonveg-badge">NON-VEG</span></td><td>280</td><td>48g</td><td>0g</td></tr>
+              <tr><td>Lunch</td><td>Quinoa (1 cup) + Veggies</td><td><span class="veg-badge">VEG</span></td><td>240</td><td>9g</td><td>40g</td></tr>
+              <tr><td>Pre-Workout (4 PM)</td><td>Peanut Butter Sandwich</td><td><span class="veg-badge">VEG</span></td><td>280</td><td>12g</td><td>35g</td></tr>
+              <tr><td>Post-Workout (6:30 PM)</td><td>Whey Protein + Milk</td><td><span class="nonveg-badge">NON-VEG</span></td><td>200</td><td>30g</td><td>12g</td></tr>
+              <tr><td>Dinner (8 PM)</td><td>Rajma Chawal (1 bowl)</td><td><span class="veg-badge">VEG</span></td><td>380</td><td>18g</td><td>65g</td></tr>
+            </tbody>
+          </table>
+          <p class="day-total"><strong>Daily Total: 1950 Cal | 165g Protein | 212g Carbs</strong></p>
+        </div>
+ 
+        <!-- FRIDAY - TRICEPS -->
+        <div class="meal-category">
+          <h3>🔱 FRIDAY — TRICEPS DAY (Recovery Nutrition)</h3>
+          <table class="meal-table">
+            <thead><tr><th>Meal Time</th><th>Item</th><th>Type</th><th>Cal</th><th>Protein</th><th>Carbs</th></tr></thead>
+            <tbody>
+              <tr><td>Breakfast (7 AM)</td><td>Poha with Vegetables</td><td><span class="veg-badge">VEG</span></td><td>200</td><td>6g</td><td>42g</td></tr>
+              <tr><td>Breakfast</td><td>Skim Milk + Protein Powder</td><td><span class="nonveg-badge">NON-VEG</span></td><td>180</td><td>30g</td><td>8g</td></tr>
+              <tr><td>Snack (10 AM)</td><td>Almonds + Raisins</td><td><span class="veg-badge">VEG</span></td><td>200</td><td>7g</td><td>22g</td></tr>
+              <tr><td>Lunch (1 PM)</td><td>Mutton Curry (150g)</td><td><span class="nonveg-badge">NON-VEG</span></td><td>300</td><td>38g</td><td>6g</td></tr>
+              <tr><td>Lunch</td><td>Jowar Roti (2) + Salad</td><td><span class="veg-badge">VEG</span></td><td>210</td><td>8g</td><td>40g</td></tr>
+              <tr><td>Pre-Workout (4 PM)</td><td>White Rice Cakes</td><td><span class="veg-badge">VEG</span></td><td>140</td><td>2g</td><td>35g</td></tr>
+              <tr><td>Post-Workout (6:30 PM)</td><td>Egg Protein Shake</td><td><span class="nonveg-badge">NON-VEG</span></td><td>140</td><td>28g</td><td>4g</td></tr>
+              <tr><td>Dinner (8 PM)</td><td>Dal Makhani + Basmati Rice</td><td><span class="veg-badge">VEG</span></td><td>400</td><td>18g</td><td>65g</td></tr>
+            </tbody>
+          </table>
+          <p class="day-total"><strong>Daily Total: 1770 Cal | 137g Protein | 222g Carbs</strong></p>
+        </div>
+ 
+        <!-- SATURDAY - LEGS -->
+        <div class="meal-category">
+          <h3>🦵 SATURDAY — LEGS DAY (Maximum Carbs)</h3>
+          <table class="meal-table">
+            <thead><tr><th>Meal Time</th><th>Item</th><th>Type</th><th>Cal</th><th>Protein</th><th>Carbs</th></tr></thead>
+            <tbody>
+              <tr><td>Breakfast (7 AM)</td><td>Pancakes (3) with Honey</td><td><span class="veg-badge">VEG</span></td><td>320</td><td>10g</td><td>60g</td></tr>
+              <tr><td>Breakfast</td><td>Boiled Eggs (3)</td><td><span class="nonveg-badge">NON-VEG</span></td><td>210</td><td>18g</td><td>2g</td></tr>
+              <tr><td>Snack (10 AM)</td><td>Rice Cakes + Banana</td><td><span class="veg-badge">VEG</span></td><td>240</td><td>4g</td><td>58g</td></tr>
+              <tr><td>Lunch (1 PM)</td><td>Lamb Curry (180g)</td><td><span class="nonveg-badge">NON-VEG</span></td><td>340</td><td>40g</td><td>8g</td></tr>
+              <tr><td>Lunch</td><td>Biryani Rice (1.5 cups)</td><td><span class="veg-badge">VEG</span></td><td>380</td><td>8g</td><td>80g</td></tr>
+              <tr><td>Pre-Workout (4 PM)</td><td>Pasta with Olive Oil</td><td><span class="veg-badge">VEG</span></td><td>300</td><td>10g</td><td>55g</td></tr>
+              <tr><td>Post-Workout (6:30 PM)</td><td>Dextrose + Whey Protein</td><td><span class="nonveg-badge">NON-VEG</span></td><td>200</td><td>30g</td><td>30g</td></tr>
+              <tr><td>Dinner (8 PM)</td><td>Chicken Tikka Masala + Naan</td><td><span class="nonveg-badge">NON-VEG</span></td><td>580</td><td>40g</td><td>60g</td></tr>
+            </tbody>
+          </table>
+          <p class="day-total"><strong>Daily Total: 2570 Cal | 160g Protein | 353g Carbs</strong></p>
+        </div>
+ 
+        <!-- SUNDAY - FULL BODY -->
+        <div class="meal-category">
+          <h3>🏋️ SUNDAY — FULL BODY DAY (Balanced Everything)</h3>
+          <table class="meal-table">
+            <thead><tr><th>Meal Time</th><th>Item</th><th>Type</th><th>Cal</th><th>Protein</th><th>Carbs</th></tr></thead>
+            <tbody>
+              <tr><td>Breakfast (7 AM)</td><td>Dosa (2) with Sambar</td><td><span class="veg-badge">VEG</span></td><td>280</td><td>10g</td><td>50g</td></tr>
+              <tr><td>Breakfast</td><td>Chicken Sausage (2)</td><td><span class="nonveg-badge">NON-VEG</span></td><td>180</td><td>22g</td><td>2g</td></tr>
+              <tr><td>Snack (10 AM)</td><td>Protein Bar + Apple Juice</td><td><span class="nonveg-badge">NON-VEG</span></td><td>220</td><td>20g</td><td>32g</td></tr>
+              <tr><td>Lunch (1 PM)</td><td>Shrimp Curry (150g)</td><td><span class="nonveg-badge">NON-VEG</span></td><td>200</td><td>35g</td><td>5g</td></tr>
+              <tr><td>Lunch</td><td>Coconut Rice (1 cup)</td><td><span class="veg-badge">VEG</span></td><td>250</td><td>5g</td><td>48g</td></tr>
+              <tr><td>Pre-Workout (4 PM)</td><td>Oats + Honey</td><td><span class="veg-badge">VEG</span></td><td>200</td><td>7g</td><td>42g</td></tr>
+              <tr><td>Post-Workout (6:30 PM)</td><td>Protein Smoothie Bowl</td><td><span class="nonveg-badge">NON-VEG</span></td><td>220</td><td>28g</td><td>28g</td></tr>
+              <tr><td>Dinner (8 PM)</td><td>Baked Fish (150g) + Sweet Potato</td><td><span class="nonveg-badge">NON-VEG</span></td><td>420</td><td>39g</td><td>42g</td></tr>
+            </tbody>
+          </table>
+          <p class="day-total"><strong>Daily Total: 1970 Cal | 166g Protein | 249g Carbs</strong></p>
+        </div>
+ 
+        <div class="info-box">
+          <h3>📋 Weekly Guidelines</h3>
+          <p>✅ <strong>Monday (Chest):</strong> High carbs for intense pressing movements<br>
+             ✅ <strong>Tuesday (Back):</strong> High protein for pulling strength<br>
+             ✅ <strong>Wednesday (Shoulders):</strong> Balanced macros for shoulder stability<br>
+             ✅ <strong>Thursday (Biceps):</strong> Protein emphasis for arm growth<br>
+             ✅ <strong>Friday (Triceps):</strong> Recovery nutrition after intense week<br>
+             ✅ <strong>Saturday (Legs):</strong> Maximum carbs for leg endurance<br>
+             ✅ <strong>Sunday (Full Body):</strong> Balanced nutrition for complete recovery</p>
+          <p><strong>Pro Tips:</strong><br>
+             • Drink 3–4L water daily<br>
+             • Eat within 30 mins post-workout<br>
+             • Adjust portions based on your body weight<br>
+             • Stay consistent with meal timing</p>
+        </div>
+      </div>
+    </div><!-- /diet -->
+ 
+ 
+    <!-- ─── ABOUT SECTION ──────────────────────────────────── -->
+    <div id="about" class="section-content">
+      <div class="content-section">
+        <h2>About MapMyHealth</h2>
+ 
+        <div class="info-box">
+          <h3>Our Mission</h3>
+          <p>MapMyHealth is dedicated to helping beginners start their fitness journey with scientifically-backed workout plans, personalized nutrition guidance, and professional support. We believe that getting fit should be accessible, fun, and sustainable.</p>
+        </div>
+ 
+        <div class="info-box">
+          <h3>What We Offer</h3>
+          <p><strong>Structured Workouts:</strong> Day-wise exercise plans targeting different muscle groups</p>
+          <p><strong>Nutrition Tracking:</strong> Detailed meal plans with calorie and macro tracking</p>
+          <p><strong>Expert Guidance:</strong> Access to certified fitness trainers and nutritionists</p>
+          <p><strong>Progress Monitoring:</strong> Track your fitness journey with body metrics</p>
+        </div>
+ 
+        <div class="info-box">
+          <h3>Our Team</h3>
+          <p>MapMyHealth is built by fitness enthusiasts and professionals with years of experience in the health and wellness industry. Our goal is to make fitness simple and achievable for everyone.</p>
+        </div>
+ 
+        <div class="info-box">
+          <h3>Why Choose Us?</h3>
+          <p>✓ Beginner-friendly workout plans<br>
+             ✓ Customized nutrition guidance<br>
+             ✓ Professional trainer support<br>
+             ✓ Easy-to-use platform<br>
+             ✓ Science-backed methods</p>
+        </div>
+      </div>
+    </div><!-- /about -->
+ 
+ 
+    <!-- ─── HELP SECTION ───────────────────────────────────── -->
+    <div id="help" class="section-content">
+      <div class="content-section">
+        <h2>Help &amp; Support</h2>
+ 
+        <div class="info-box">
+          <h3>Getting Started</h3>
+          <p><strong>1. Complete Your Profile:</strong> Enter your age, height, and weight for personalized recommendations</p>
+          <p><strong>2. Select Your Workout Day:</strong> Choose the day from the WORKOUTS tab to see muscle group exercises</p>
+          <p><strong>3. Follow the Meal Plan:</strong> Check the DIET tab for detailed nutrition information</p>
+          <p><strong>4. Track Your Progress:</strong> Update your profile regularly to monitor improvements</p>
+        </div>
+ 
+        <div class="info-box">
+          <h3>FAQ</h3>
+          <p><strong>Q: Can I modify the workout schedule?</strong><br>
+             A: Yes! Feel free to adjust the days based on your availability. Consistency is key.</p>
+          <p><strong>Q: What if I'm vegetarian?</strong><br>
+             A: Our meal plans include both veg and non-veg options. Choose according to your preference.</p>
+          <p><strong>Q: How long will it take to see results?</strong><br>
+             A: With consistent effort, most beginners see visible changes in 4–6 weeks.</p>
+        </div>
+ 
+        <div class="info-box">
+          <h3>Contact Us</h3>
+          <p><strong>Email:</strong> support@mapmyhealth.in</p>
+          <p><strong>Phone:</strong> +91-800-FIT-HELP</p>
+          <p><strong>Hours:</strong> Monday – Sunday, 9:00 AM – 9:00 PM</p>
+          <p><strong>Address:</strong> Fitness Hub, Hyderabad, India</p>
+        </div>
+ 
+        <div class="info-box">
+          <h3>Tips for Success</h3>
+          <p>✓ Drink at least 3–4 litres of water daily<br>
+             ✓ Get 7–8 hours of quality sleep<br>
+             ✓ Follow the meal plan consistently<br>
+             ✓ Warm up before every workout<br>
+             ✓ Rest 48 hours between same muscle group sessions</p>
+        </div>
+      </div>
+    </div><!-- /help -->
+ 
+ 
+    <!-- ─── TRAINER SECTION ────────────────────────────────── -->
+    <div id="trainer" class="section-content">
+      <div class="content-section">
+        <h2>Personal Training Services</h2>
+ 
+        <div class="trainer-grid">
+          <div class="trainer-card">
+            <div class="trainer-avatar">💪</div>
+            <h4>Raj Kumar</h4>
+            <p>Strength &amp; Muscle Building</p>
+            <p>⭐ 7+ years experience</p>
+            <button class="btn-book" onclick="bookTrainer('Raj Kumar')">Book Session</button>
+          </div>
+ 
+          <div class="trainer-card">
+            <div class="trainer-avatar">🏃</div>
+            <h4>Priya Sharma</h4>
+            <p>Weight Loss &amp; Cardio</p>
+            <p>⭐ 5+ years experience</p>
+            <button class="btn-book" onclick="bookTrainer('Priya Sharma')">Book Session</button>
+          </div>
+ 
+          <div class="trainer-card">
+            <div class="trainer-avatar">🧘</div>
+            <h4>Arjun Singh</h4>
+            <p>Flexibility &amp; Functional Training</p>
+            <p>⭐ 6+ years experience</p>
+            <button class="btn-book" onclick="bookTrainer('Arjun Singh')">Book Session</button>
+          </div>
+        </div>
+ 
+        <div class="info-box">
+          <h3>Training Packages</h3>
+          <p><strong>Basic (₹3,000/month):</strong> 4 sessions per month</p>
+          <p><strong>Standard (₹6,000/month):</strong> 8 sessions + Nutrition Plan</p>
+          <p><strong>Premium (₹10,000/month):</strong> 12 sessions + Diet + Progress Tracking</p>
+        </div>
+ 
+        <div class="info-box">
+          <h3>Book Your First Session</h3>
+          <p>Call <strong>+91-800-FIT-HELP</strong> or email <strong>trainers@mapmyhealth.in</strong> for a free consultation!</p>
+        </div>
+      </div>
+    </div><!-- /trainer -->
+ 
+ 
+    <!-- ─── EXERCISE POPUP ─────────────────────────────────── -->
+    <div id="exercise-view">
+      <h2 id="ex-title"></h2>
+      <div id="ex-list"></div>
+      <button class="btn-main" onclick="closeEx()" style="margin-top:10px;">✕ Close</button>
+    </div>
+ 
+  </div><!-- /dashboard -->
+ 
+ 
+  <script src="/js/app.js"></script>
+</body>
+</html>
