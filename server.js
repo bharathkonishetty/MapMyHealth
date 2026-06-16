@@ -375,6 +375,143 @@ app.patch('/api/goals/:id/status', async (req, res) => {
   }
 });
 
+// ─── Journey Map: Dynamic Fetch (Phase 3) ──────────────────────────
+app.get('/api/journey/map', async (req, res) => {
+  if (!req.session.user)
+    return res.json({ success: false, message: 'Not logged in.' });
+
+  try {
+    const userId = req.session.user.id;
+
+    // 1. Fetch active goal
+    const goalRes = await pool.query(
+      `SELECT * FROM goals WHERE user_id = $1 AND status = 'active' LIMIT 1`,
+      [userId]
+    );
+
+    if (goalRes.rows.length === 0) {
+      return res.json({ success: true, activeGoal: null, message: 'No active goal found.' });
+    }
+
+    const activeGoal = goalRes.rows[0];
+
+    // 2. Fetch latest weight from progress logs
+    const weightRes = await pool.query(
+      `SELECT weight FROM progress_logs
+       WHERE user_id = $1
+       ORDER BY log_date DESC, created_at DESC LIMIT 1`,
+      [userId]
+    );
+
+    const sw = parseFloat(activeGoal.start_weight);
+    const tw = parseFloat(activeGoal.target_weight);
+    const currentWeight = weightRes.rows.length > 0 && weightRes.rows[0].weight !== null
+      ? parseFloat(weightRes.rows[0].weight)
+      : sw;
+
+    let progressPct = 0;
+    const goalType = activeGoal.goal_type;
+
+    if (goalType === 'weight_loss') {
+      if (sw !== tw) {
+        progressPct = ((sw - currentWeight) / (sw - tw)) * 100;
+      }
+    } else if (goalType === 'muscle_gain') {
+      if (sw !== tw) {
+        progressPct = ((currentWeight - sw) / (tw - sw)) * 100;
+      }
+    } else if (goalType === 'maintenance') {
+      const startMs = new Date(activeGoal.start_date).getTime();
+      const targetMs = new Date(activeGoal.target_date).getTime();
+      const nowMs = Math.min(targetMs, Math.max(startMs, Date.now()));
+      if (targetMs !== startMs) {
+        progressPct = ((nowMs - startMs) / (targetMs - startMs)) * 100;
+      } else {
+        progressPct = 100;
+      }
+    }
+
+    progressPct = Math.max(0, Math.min(100, Math.round(progressPct * 10) / 10));
+
+    // 3. Dynamically construct the 5 named milestones in-memory
+    const checkpoints = [];
+
+    if (goalType === 'weight_loss' || goalType === 'muscle_gain') {
+      const diff = tw - sw;
+      const step = diff / 4;
+
+      const milestonesInfo = [
+        { title: 'Starting Point', pct: 0, label: `Start Weight: ${sw} kg`, val: sw },
+        { title: 'First Step', pct: 25, label: `Target Weight: ${(sw + step).toFixed(1)} kg`, val: sw + step },
+        { title: 'Halfway Hero', pct: 50, label: `Target Weight: ${(sw + 2 * step).toFixed(1)} kg`, val: sw + 2 * step },
+        { title: 'Momentum', pct: 75, label: `Target Weight: ${(sw + 3 * step).toFixed(1)} kg`, val: sw + 3 * step },
+        { title: 'Destination', pct: 100, label: `Goal Weight: ${tw} kg`, val: tw }
+      ];
+
+      for (let i = 0; i < milestonesInfo.length; i++) {
+        const m = milestonesInfo[i];
+        const isCompleted = progressPct >= m.pct;
+        checkpoints.push({
+          title: m.title,
+          description: m.label,
+          checkpoint_type: i === 0 ? 'start' : (i === 4 ? 'destination' : 'milestone'),
+          sequence_order: i,
+          target_value: Math.round(m.val * 100) / 100,
+          is_completed: isCompleted
+        });
+      }
+    } else if (goalType === 'maintenance') {
+      const start = new Date(activeGoal.start_date);
+      const target = new Date(activeGoal.target_date);
+      const diffMs = target.getTime() - start.getTime();
+
+      const getCheckDate = (ratio) => {
+        const checkMs = start.getTime() + diffMs * ratio;
+        return new Date(checkMs).toISOString().split('T')[0];
+      };
+
+      const formatCheckDate = (dStr) => {
+        return new Date(dStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      };
+
+      const milestonesInfo = [
+        { title: 'Starting Point', pct: 0, label: `Maintain weight at ${tw} kg`, date: activeGoal.start_date },
+        { title: 'First Step', pct: 25, label: `Maintain until ${formatCheckDate(getCheckDate(0.25))}`, date: getCheckDate(0.25) },
+        { title: 'Halfway Hero', pct: 50, label: `Maintain until ${formatCheckDate(getCheckDate(0.50))}`, date: getCheckDate(0.50) },
+        { title: 'Momentum', pct: 75, label: `Maintain until ${formatCheckDate(getCheckDate(0.75))}`, date: getCheckDate(0.75) },
+        { title: 'Destination', pct: 100, label: `Successfully maintain until ${formatCheckDate(activeGoal.target_date)}`, date: activeGoal.target_date }
+      ];
+
+      const isWeightStable = Math.abs(currentWeight - tw) <= 2;
+
+      for (let i = 0; i < milestonesInfo.length; i++) {
+        const m = milestonesInfo[i];
+        const isCompleted = progressPct >= m.pct && isWeightStable;
+        checkpoints.push({
+          title: m.title,
+          description: m.label,
+          checkpoint_type: i === 0 ? 'start' : (i === 4 ? 'destination' : 'milestone'),
+          sequence_order: i,
+          target_value: tw,
+          is_completed: isCompleted
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      activeGoal,
+      currentWeight,
+      progressPct,
+      checkpoints
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.json({ success: false, message: 'Server error. Please try again.' });
+  }
+});
+
 // ─── Serve SPA ────────────────────────────────────────────────────
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
