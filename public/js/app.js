@@ -21,6 +21,11 @@ async function apiPost(endpoint, data) {
   return res.json();
 }
  
+async function apiGet(endpoint) {
+  const res = await fetch(endpoint);
+  return res.json();
+}
+ 
 // ─── Auth: Check session on load ─────────────────────────────────
 window.addEventListener('load', async () => {
   const data = await fetch('/api/session').then(r => r.json());
@@ -101,6 +106,8 @@ function showDashboard(user) {
   document.getElementById('u-age').value    = user.age    || '';
   document.getElementById('u-height').value = user.height || '';
   document.getElementById('u-weight').value = user.weight || '';
+
+  loadGoals();
 }
  
 // ─── Save Profile Stats ───────────────────────────────────────────
@@ -302,6 +309,277 @@ function closeEx() {
 // ─── Book Trainer ─────────────────────────────────────────────────
 function bookTrainer(trainerName) {
   showToast(`✅ Booking request sent for ${trainerName}! We'll contact you soon.`);
+}
+ 
+// ─── Goals: Load ──────────────────────────────────────────────────
+async function loadGoals() {
+  const data = await apiGet('/api/goals');
+  if (data.success) renderGoals(data.goals);
+}
+ 
+// ─── Goals: Render ─────────────────────────────────────────────────
+function renderGoals(goals) {
+  const activeArea = document.getElementById('active-goal-area');
+  const pastArea   = document.getElementById('past-goals-area');
+  const newBtn     = document.getElementById('btn-new-goal');
+  if (!activeArea) return;
+
+  const activeGoals = goals.filter(g => g.status === 'active');
+  const pastGoals   = goals.filter(g => g.status !== 'active');
+
+  if (activeGoals.length === 0) {
+    activeArea.innerHTML = `
+      <div class="goals-empty">
+        <i class="fas fa-map-location-dot"></i>
+        <h3>No active goal yet</h3>
+        <p>Set your first health goal to begin mapping your journey.</p>
+        <button class="btn-main" style="width:auto;padding:12px 28px;" onclick="openGoalModal()">
+          <i class="fas fa-plus"></i>&nbsp; Set My First Goal
+        </button>
+      </div>`;
+    if (newBtn) newBtn.style.display = 'none';
+  } else {
+    if (newBtn) newBtn.style.display = 'flex';
+    activeArea.innerHTML = activeGoals.map(goalCardHTML).join('');
+  }
+
+  if (pastGoals.length > 0) {
+    pastArea.innerHTML = `
+      <p class="past-goals-title">Past Goals</p>
+      ${pastGoals.map(g => `
+        <div class="past-goal-item">
+          <div class="past-goal-info">
+            <h4>${escapeHtml(g.goal_name || goalTypeLabel(g.goal_type))}</h4>
+            <p>${g.start_weight} kg → ${g.target_weight} kg &nbsp;·&nbsp; Target: ${formatDate(g.target_date)}</p>
+          </div>
+          <span class="status-badge-${g.status}">${capitalize(g.status)}</span>
+        </div>`).join('')}`;
+  } else {
+    pastArea.innerHTML = '';
+  }
+}
+ 
+// ─── Goals: Card HTML ──────────────────────────────────────────────
+function goalCardHTML(g) {
+  const daysLeft = Math.max(0, Math.ceil((new Date(g.target_date) - new Date()) / (1000*60*60*24)));
+  const badgeClass = `badge-${g.goal_type}`;
+  return `
+    <div class="goal-card">
+      <div class="goal-card-header">
+        <div class="goal-card-title">
+          <h3>${escapeHtml(g.goal_name || goalTypeLabel(g.goal_type))}</h3>
+          <span class="goal-type-badge ${badgeClass}">${goalTypeLabel(g.goal_type)}</span>
+        </div>
+        <div class="goal-card-actions">
+          <button class="btn-goal-edit" onclick="openGoalModal('${g.id}')">
+            <i class="fas fa-pen"></i> Edit
+          </button>
+          <button class="btn-goal-complete" onclick="updateGoalStatus('${g.id}','completed')">
+            <i class="fas fa-check"></i> Complete
+          </button>
+          <button class="btn-goal-cancel-action" onclick="updateGoalStatus('${g.id}','cancelled')">
+            <i class="fas fa-xmark"></i> Cancel
+          </button>
+        </div>
+      </div>
+
+      <div class="goal-stats">
+        <div class="goal-stat">
+          <div class="stat-label">Start</div>
+          <div class="stat-value">${g.start_weight} kg</div>
+        </div>
+        <div class="goal-stat">
+          <div class="stat-label">Current</div>
+          <div class="stat-value current">${g.current_weight} kg</div>
+        </div>
+        <div class="goal-stat">
+          <div class="stat-label">Target</div>
+          <div class="stat-value target">${g.target_weight} kg</div>
+        </div>
+      </div>
+
+      <div class="goal-progress-section">
+        <div class="goal-progress-label">
+          <span>Progress</span>
+          <span class="pct">${g.progress_pct}%</span>
+        </div>
+        <div class="goal-progress-bar">
+          <div class="goal-progress-fill" style="width:${g.progress_pct}%"></div>
+        </div>
+      </div>
+
+      <div class="goal-days">
+        <span>${daysLeft}</span> days remaining · Target: ${formatDate(g.target_date)}
+      </div>
+    </div>`;
+}
+ 
+// ─── Goals: Open Modal ─────────────────────────────────────────────
+async function openGoalModal(goalId) {
+  const overlay = document.getElementById('goal-modal-overlay');
+  const modal   = document.getElementById('goal-modal');
+  const title   = document.getElementById('goal-modal-title');
+  const submit  = document.getElementById('btn-goal-submit');
+  const msg     = document.getElementById('goal-modal-msg');
+
+  // Reset
+  document.getElementById('goal-edit-id').value       = '';
+  document.getElementById('goal-name').value          = '';
+  document.getElementById('goal-type-value').value    = '';
+  document.getElementById('goal-start-weight').value  = '';
+  document.getElementById('goal-target-weight').value = '';
+  document.getElementById('goal-target-date').value   = '';
+  document.getElementById('goal-start-weight').disabled = false;
+  msg.textContent = '';
+  msg.className   = 'msg';
+  document.querySelectorAll('.goal-type-option').forEach(el => {
+    el.classList.remove('selected');
+    el.style.pointerEvents = '';
+    el.style.opacity = '';
+  });
+
+  if (goalId) {
+    title.textContent  = 'Edit Goal';
+    submit.textContent = 'Save Changes';
+    document.getElementById('goal-edit-id').value = goalId;
+
+    const data = await apiGet('/api/goals');
+    if (data.success) {
+      const g = data.goals.find(g => g.id === goalId);
+      if (g) {
+        document.getElementById('goal-name').value          = g.goal_name || '';
+        document.getElementById('goal-start-weight').value  = g.start_weight;
+        document.getElementById('goal-target-weight').value = g.target_weight;
+        document.getElementById('goal-target-date').value   = (g.target_date || '').split('T')[0];
+        selectGoalType(g.goal_type);
+        // Lock immutable fields in edit mode
+        document.getElementById('goal-start-weight').disabled = true;
+        document.querySelectorAll('.goal-type-option').forEach(el => {
+          el.style.pointerEvents = 'none';
+          el.style.opacity = el.dataset.type === g.goal_type ? '1' : '0.4';
+        });
+      }
+    }
+  } else {
+    title.textContent  = 'Set New Goal';
+    submit.textContent = 'Create Goal';
+  }
+
+  overlay.style.display = 'block';
+  modal.style.display   = 'block';
+}
+ 
+// ─── Goals: Close Modal ───────────────────────────────────────────
+function closeGoalModal() {
+  document.getElementById('goal-modal-overlay').style.display = 'none';
+  document.getElementById('goal-modal').style.display         = 'none';
+  document.getElementById('goal-start-weight').disabled       = false;
+  document.querySelectorAll('.goal-type-option').forEach(el => {
+    el.style.pointerEvents = '';
+    el.style.opacity = '';
+  });
+}
+ 
+// ─── Goals: Select Type ──────────────────────────────────────────
+function selectGoalType(type) {
+  document.getElementById('goal-type-value').value = type;
+  document.querySelectorAll('.goal-type-option').forEach(el => {
+    el.classList.toggle('selected', el.dataset.type === type);
+  });
+}
+ 
+// ─── Goals: Submit (Create or Edit) ───────────────────────────────
+async function submitGoal() {
+  const editId        = document.getElementById('goal-edit-id').value;
+  const goal_name     = document.getElementById('goal-name').value.trim();
+  const goal_type     = document.getElementById('goal-type-value').value;
+  const start_weight  = document.getElementById('goal-start-weight').value;
+  const target_weight = document.getElementById('goal-target-weight').value;
+  const target_date   = document.getElementById('goal-target-date').value;
+  const msg           = document.getElementById('goal-modal-msg');
+
+  msg.textContent = '';
+  msg.className   = 'msg';
+
+  if (!editId && !goal_type) {
+    msg.textContent = 'Please select a goal type.'; msg.className = 'msg error'; return;
+  }
+  if (!editId && (!start_weight || isNaN(parseFloat(start_weight)))) {
+    msg.textContent = 'Please enter a valid start weight.'; msg.className = 'msg error'; return;
+  }
+  if (!target_weight || isNaN(parseFloat(target_weight))) {
+    msg.textContent = 'Please enter a valid target weight.'; msg.className = 'msg error'; return;
+  }
+  if (!target_date) {
+    msg.textContent = 'Please select a target date.'; msg.className = 'msg error'; return;
+  }
+  const today = new Date(); today.setHours(0,0,0,0);
+  if (new Date(target_date) <= today) {
+    msg.textContent = 'Target date must be in the future.'; msg.className = 'msg error'; return;
+  }
+
+  let result;
+  if (editId) {
+    result = await fetch(`/api/goals/${editId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ goal_name, target_weight: parseFloat(target_weight), target_date })
+    }).then(r => r.json());
+  } else {
+    result = await apiPost('/api/goals', {
+      goal_name, goal_type,
+      start_weight: parseFloat(start_weight),
+      target_weight: parseFloat(target_weight),
+      target_date
+    });
+  }
+
+  if (result.success) {
+    closeGoalModal();
+    await loadGoals();
+    showToast(editId ? '✓ Goal updated.' : '✓ Goal created! Your journey has begun.');
+  } else {
+    msg.textContent = result.message;
+    msg.className   = 'msg error';
+  }
+}
+ 
+// ─── Goals: Update Status ──────────────────────────────────────────
+async function updateGoalStatus(goalId, status) {
+  const label = status === 'completed' ? 'mark this goal as completed' : 'cancel this goal';
+  if (!confirm(`Are you sure you want to ${label}? This cannot be undone.`)) return;
+
+  const result = await fetch(`/api/goals/${goalId}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status })
+  }).then(r => r.json());
+
+  if (result.success) {
+    await loadGoals();
+    showToast(status === 'completed' ? '🎉 Goal completed! Well done.' : 'Goal cancelled.');
+  } else {
+    showToast('Error: ' + result.message);
+  }
+}
+ 
+// ─── Goals: Helpers ─────────────────────────────────────────────────
+function goalTypeLabel(type) {
+  return { weight_loss: 'Weight Loss', muscle_gain: 'Muscle Gain', maintenance: 'Maintenance' }[type] || type;
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function capitalize(str) {
+  return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
 }
  
 // ─── Enter key support for forms ──────────────────────────────────

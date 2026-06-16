@@ -80,6 +80,7 @@
     <!-- Navigation Tabs -->
     <div class="nav-tabs">
       <button class="nav-tab active" onclick="switchSection('workouts', this)">WORKOUTS</button>
+      <button class="nav-tab"        onclick="switchSection('goals', this)">GOALS</button>
       <button class="nav-tab"        onclick="switchSection('diet', this)">DIET</button>
       <button class="nav-tab"        onclick="switchSection('about', this)">ABOUT</button>
       <button class="nav-tab"        onclick="switchSection('help', this)">HELP</button>
@@ -415,6 +416,73 @@
       <button class="btn-main" onclick="closeEx()" style="margin-top:10px;">✕ Close</button>
     </div>
  
+
+    <!-- ─── GOALS SECTION ─────────────────────────────────────────── -->
+    <div id="goals" class="section-content">
+      <div class="goals-section-inner">
+
+        <div class="goals-header">
+          <h2>My Health Goals</h2>
+          <button class="btn-new-goal" id="btn-new-goal" onclick="openGoalModal()">
+            <i class="fas fa-plus"></i> Set New Goal
+          </button>
+        </div>
+
+        <div id="active-goal-area"></div>
+        <div id="past-goals-area"></div>
+
+      </div>
+    </div><!-- /goals -->
+
+
+    <!-- ─── GOAL MODAL ───────────────────────────────────────────── -->
+    <div id="goal-modal-overlay" onclick="closeGoalModal()"></div>
+    <div id="goal-modal">
+      <h3 id="goal-modal-title">Set New Goal</h3>
+
+      <input type="hidden" id="goal-edit-id">
+
+      <label>Goal Name <span class="optional">(optional)</span></label>
+      <input type="text" id="goal-name" placeholder='e.g. "Summer Cut 2026"' maxlength="100">
+
+      <label>Goal Type</label>
+      <div class="goal-type-selector" id="goal-type-selector">
+        <div class="goal-type-option" data-type="weight_loss" onclick="selectGoalType('weight_loss')">
+          <i class="fas fa-arrow-trend-down"></i>
+          <span>Weight Loss</span>
+        </div>
+        <div class="goal-type-option" data-type="muscle_gain" onclick="selectGoalType('muscle_gain')">
+          <i class="fas fa-dumbbell"></i>
+          <span>Muscle Gain</span>
+        </div>
+        <div class="goal-type-option" data-type="maintenance" onclick="selectGoalType('maintenance')">
+          <i class="fas fa-scale-balanced"></i>
+          <span>Maintenance</span>
+        </div>
+      </div>
+      <input type="hidden" id="goal-type-value">
+
+      <div class="goal-weights">
+        <div>
+          <label>Start Weight (kg)</label>
+          <input type="number" id="goal-start-weight" placeholder="e.g. 82.5" min="20" max="300" step="0.1">
+        </div>
+        <div>
+          <label>Target Weight (kg)</label>
+          <input type="number" id="goal-target-weight" placeholder="e.g. 72.0" min="20" max="300" step="0.1">
+        </div>
+      </div>
+
+      <label>Target Date</label>
+      <input type="date" id="goal-target-date">
+
+      <p id="goal-modal-msg" class="msg"></p>
+
+      <button class="btn-main" id="btn-goal-submit" onclick="submitGoal()">Create Goal</button>
+      <button class="btn-goal-cancel-modal" onclick="closeGoalModal()">Cancel</button>
+    </div><!-- /goal-modal -->
+
+
   </div><!-- /dashboard -->
  
  
