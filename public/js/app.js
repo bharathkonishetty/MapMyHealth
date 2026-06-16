@@ -110,6 +110,8 @@ function showDashboard(user) {
   loadGoals();
   loadJourney();
   loadAnalytics();
+  loadCheckin();
+  loadHealthScore();
 }
  
 // ─── Save Profile Stats ───────────────────────────────────────────
@@ -124,6 +126,8 @@ async function saveProfile() {
     loadGoals();
     loadJourney();
     loadAnalytics();
+    loadCheckin();
+    loadHealthScore();
   }
 }
  
@@ -162,6 +166,10 @@ function switchSection(sectionId, btn) {
     loadJourney();
   } else if (sectionId === 'analytics') {
     loadAnalytics();
+  } else if (sectionId === 'checkin') {
+    loadCheckin();
+  } else if (sectionId === 'healthscore') {
+    loadHealthScore();
   }
 }
  
@@ -552,6 +560,8 @@ async function submitGoal() {
     await loadGoals();
     loadJourney();
     loadAnalytics();
+    loadCheckin();
+    loadHealthScore();
     showToast(editId ? '✓ Goal updated.' : '✓ Goal created! Your journey has begun.');
   } else {
     msg.textContent = result.message;
@@ -574,6 +584,8 @@ async function updateGoalStatus(goalId, status) {
     await loadGoals();
     loadJourney();
     loadAnalytics();
+    loadCheckin();
+    loadHealthScore();
     showToast(status === 'completed' ? '🎉 Goal completed! Well done.' : 'Goal cancelled.');
   } else {
     showToast('Error: ' + result.message);
@@ -1204,6 +1216,506 @@ function showChartTooltip(e, dateStr, weightStr) {
 function hideChartTooltip() {
   const tooltip = document.getElementById('chart-tooltip');
   if (tooltip) tooltip.style.display = 'none';
+}
+
+// ─── Daily Check-In: Load Data (Phase 5) ─────────────────────────────
+async function loadCheckin() {
+  const container = document.getElementById('checkin-main-area');
+  const streakContainer = document.getElementById('checkin-streak-badge-container');
+  if (!container) return;
+
+  if (streakContainer) streakContainer.innerHTML = '';
+  container.innerHTML = `
+    <div style="text-align:center;padding:50px 0;color:rgba(255,255,255,0.4);">
+      <i class="fas fa-spinner fa-spin" style="font-size:2rem;margin-bottom:12px;"></i>
+      <p>Loading daily check-in...</p>
+    </div>`;
+
+  try {
+    // 1. Fetch today's check-in & streaks
+    const response = await fetch('/api/checkin/today').then(r => r.json());
+    
+    // 2. Fetch goals to get active goal info
+    const goalsRes = await fetch('/api/goals').then(r => r.json());
+    const activeGoal = goalsRes.success && goalsRes.goals ? goalsRes.goals.find(g => g.status === 'active') : null;
+
+    if (response.success) {
+      renderCheckinView(response, activeGoal);
+    } else {
+      container.innerHTML = `
+        <div class="journey-empty-card">
+          <i class="fas fa-circle-exclamation" style="color:var(--danger-red);"></i>
+          <h3>Failed to load daily check-in</h3>
+          <p>${response.message || 'Please refresh the page.'}</p>
+        </div>`;
+    }
+  } catch (err) {
+    console.error(err);
+    container.innerHTML = `
+      <div class="journey-empty-card">
+        <i class="fas fa-circle-exclamation" style="color:var(--danger-red);"></i>
+        <h3>Connection error</h3>
+        <p>Could not connect to server. Please try again.</p>
+      </div>`;
+  }
+}
+
+// ─── Daily Check-In: Render Form (Phase 5) ───────────────────────────
+function renderCheckinView(response, activeGoal) {
+  const container = document.getElementById('checkin-main-area');
+  const streakContainer = document.getElementById('checkin-streak-badge-container');
+  if (!container) return;
+
+  const logged = response.logged;
+  const data = response.data || {};
+  const streak = response.streak || { currentStreak: 0, bestStreak: 0 };
+
+  // 1. Update streak badge in header
+  if (streakContainer) {
+    streakContainer.innerHTML = `
+      <span class="badge-status-ontrack" style="padding: 4px 10px; font-size: 10px;">
+        <i class="fas fa-fire" style="color: var(--warning-gold); margin-right: 4px;"></i> Streak: ${streak.currentStreak} ${streak.currentStreak === 1 ? 'Day' : 'Days'}
+      </span>
+    `;
+  }
+
+  // 2. Setup right column active goal context card
+  let activeGoalHTML = `
+    <div style="text-align: center; padding: 20px; opacity: 0.5;">
+      <i class="fas fa-map-location-dot" style="font-size: 32px; margin-bottom: 8px;"></i>
+      <p style="font-size: 12px; margin: 0;">No active goal selected. Set a goal to see parameters here.</p>
+    </div>
+  `;
+
+  if (activeGoal) {
+    activeGoalHTML = `
+      <h3>Goal Roadmap Target</h3>
+      <div class="metrics-panel-stack" style="gap: 12px;">
+        <div class="insight-stat-row">
+          <span class="label">Current Goal</span>
+          <span class="val highlight">${escapeHtml(activeGoal.goal_name || goalTypeLabel(activeGoal.goal_type))}</span>
+        </div>
+        <div class="insight-stat-row">
+          <span class="label">Target Date</span>
+          <span class="val">${formatDate(activeGoal.target_date)}</span>
+        </div>
+        <div class="insight-stat-row">
+          <span class="label">Target Weight</span>
+          <span class="val" style="color: var(--accent-green);">${activeGoal.target_weight} kg</span>
+        </div>
+        <div class="insight-stat-row">
+          <span class="label">Completed Progress</span>
+          <span class="val highlight">${activeGoal.progress_pct}%</span>
+        </div>
+      </div>
+      <div class="coach-guidance-box" style="margin-top: 16px; display: flex; gap: 10px; align-items: flex-start;">
+        <i class="fas fa-compass" style="color: var(--primary-teal); font-size: 1.1rem; margin-top: 2px;"></i>
+        <p style="margin: 0; font-size: 11.5px; line-height: 1.4; color: rgba(255,255,255,0.7);">
+          Daily check-in logs feed directly into your <strong>${goalTypeLabel(activeGoal.goal_type)}</strong> route progress. Logging weight updates the roadmap dynamically.
+        </p>
+      </div>
+    `;
+  }
+
+  const weightVal = data.weight !== null && data.weight !== undefined ? data.weight : '';
+  const stepsVal = data.steps_count !== null && data.steps_count !== undefined ? data.steps_count : '';
+  const waterVal = data.water_intake_l !== null && data.water_intake_l !== undefined ? data.water_intake_l.toFixed(1) : '0.0';
+  const notesVal = data.notes || '';
+  const durationVal = data.workout_duration_mins !== null && data.workout_duration_mins !== undefined ? data.workout_duration_mins : '';
+
+  container.innerHTML = `
+    <div class="analytics-grid">
+      <!-- Left Column: Form -->
+      <form id="checkin-form" onsubmit="saveCheckin(event)" class="analytics-card" style="padding: 28px;">
+        <h3>Today's Tracking Metrics</h3>
+        
+        <div class="metrics-panel-stack" style="gap: 18px;">
+          
+          <div class="form-group-flex">
+            <!-- Weight Input -->
+            <div style="flex: 1;">
+              <label style="display:block; font-size: 11px; color:rgba(255,255,255,0.5); margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Weight (kg)</label>
+              <input type="number" id="checkin-weight" step="0.1" min="1" max="500" class="input-field" placeholder="e.g. 85.0" style="width: 100%;" value="${weightVal}">
+            </div>
+            
+            <!-- Steps Input -->
+            <div style="flex: 1;">
+              <label style="display:block; font-size: 11px; color:rgba(255,255,255,0.5); margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Steps Walked</label>
+              <input type="number" id="checkin-steps" min="0" max="100000" class="input-field" placeholder="e.g. 10000" style="width: 100%;" value="${stepsVal}">
+            </div>
+          </div>
+
+          <!-- Water Intake Stepper -->
+          <div>
+            <label style="display:block; font-size: 11px; color:rgba(255,255,255,0.5); margin-bottom: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Water Intake (Liters)</label>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <button type="button" class="btn-goal-edit" style="padding: 10px 16px; min-width: 50px;" onclick="adjustWater(-0.5)">-0.5 L</button>
+              <input type="number" id="checkin-water" step="0.1" min="0" max="20" class="input-field" style="text-align: center; font-size: 18px; font-weight: 700; width: 90px; color: var(--primary-teal);" value="${waterVal}">
+              <button type="button" class="btn-goal-edit" style="padding: 10px 16px; min-width: 50px;" onclick="adjustWater(0.5)">+0.5 L</button>
+              <span style="font-size: 12px; color: rgba(255,255,255,0.45);"><i class="fas fa-droplet" style="color:var(--primary-teal); margin-right: 4px;"></i> Optional</span>
+            </div>
+          </div>
+
+          <!-- Workout Toggle Checkbox -->
+          <div>
+            <label style="display:flex; align-items:center; gap: 10px; cursor: pointer; font-size:13px; user-select:none; font-weight: 600;">
+              <input type="checkbox" id="checkin-workout-completed" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-teal);" onchange="toggleWorkoutDuration()" ${data.workout_completed ? 'checked' : ''}>
+              <span>Completed a Workout Today</span>
+            </label>
+          </div>
+
+          <!-- Workout Duration (collapsible) -->
+          <div id="checkin-workout-duration-wrapper" style="display: ${data.workout_completed ? 'block' : 'none'};">
+            <label style="display:block; font-size: 11px; color:rgba(255,255,255,0.5); margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Workout Duration (minutes)</label>
+            <input type="number" id="checkin-workout-duration" min="0" max="1440" class="input-field" placeholder="e.g. 45" style="width: 100%;" value="${durationVal}">
+          </div>
+
+          <!-- Energy Level Selector -->
+          <div>
+            <label style="display:block; font-size: 11px; color:rgba(255,255,255,0.5); margin-bottom: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Energy Level (Mandatory)</label>
+            <div class="energy-selector-grid">
+              <button type="button" class="energy-btn ${data.energy_level === 1 ? 'selected' : ''}" data-level="1" onclick="selectEnergyLevel(1)">
+                <span class="emoji">⚡</span>
+                <span class="lbl">Exhausted</span>
+              </button>
+              <button type="button" class="energy-btn ${data.energy_level === 2 ? 'selected' : ''}" data-level="2" onclick="selectEnergyLevel(2)">
+                <span class="emoji">🥱</span>
+                <span class="lbl">Tired</span>
+              </button>
+              <button type="button" class="energy-btn ${data.energy_level === 3 ? 'selected' : ''}" data-level="3" onclick="selectEnergyLevel(3)">
+                <span class="emoji">😐</span>
+                <span class="lbl">Normal</span>
+              </button>
+              <button type="button" class="energy-btn ${data.energy_level === 4 ? 'selected' : ''}" data-level="4" onclick="selectEnergyLevel(4)">
+                <span class="emoji">🔋</span>
+                <span class="lbl">Energetic</span>
+              </button>
+              <button type="button" class="energy-btn ${data.energy_level === 5 ? 'selected' : ''}" data-level="5" onclick="selectEnergyLevel(5)">
+                <span class="emoji">🔥</span>
+                <span class="lbl">Peak</span>
+              </button>
+            </div>
+            <input type="hidden" id="checkin-energy-val" value="${data.energy_level || ''}">
+          </div>
+
+          <!-- Notes Textarea -->
+          <div>
+            <label style="display:block; font-size: 11px; color:rgba(255,255,255,0.5); margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Notes (Optional)</label>
+            <textarea id="checkin-notes" class="input-field" rows="3" placeholder="How was your consistency? Notes on nutrition or mood..." style="width:100%; font-family:inherit; resize:vertical; max-height:120px;">${notesVal}</textarea>
+          </div>
+
+          <div id="checkin-msg" class="msg" style="margin: 0;"></div>
+
+          <button type="submit" class="btn-main" style="width: 100%; padding: 14px; font-weight:700; margin-top: 10px;">
+            <i class="fas fa-check"></i>&nbsp; ${logged ? 'Update Daily Check-In' : 'Submit Daily Check-In'}
+          </button>
+        </div>
+      </form>
+
+      <!-- Right Column: Streaks and Contextual Guidance -->
+      <div class="metrics-panel-stack">
+        <!-- Streak Stats Card -->
+        <div class="analytics-card" style="text-align: center; padding: 32px 24px;">
+          <h3>Daily Check-in Streak</h3>
+          <div style="display: flex; justify-content: space-around; margin: 24px 0 12px; align-items: center;">
+            <div>
+              <div style="font-size: 42px; margin-bottom: 8px;">🔥</div>
+              <div id="streak-current-val" style="font-size: 32px; font-weight: 800; color: var(--warning-gold);">${streak.currentStreak} ${streak.currentStreak === 1 ? 'Day' : 'Days'}</div>
+              <div style="font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Current Streak</div>
+            </div>
+            
+            <div style="border-left: 1px solid rgba(255,255,255,0.08); height: 80px;"></div>
+
+            <div>
+              <div style="font-size: 42px; margin-bottom: 8px;">👑</div>
+              <div id="streak-best-val" style="font-size: 32px; font-weight: 800; color: var(--primary-teal);">${streak.bestStreak} ${streak.bestStreak === 1 ? 'Day' : 'Days'}</div>
+              <div style="font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Best Streak</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Goal Quick Overview Card -->
+        <div class="analytics-card" id="checkin-active-goal-overview">
+          ${activeGoalHTML}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ─── Daily Check-In: Click Handlers & Adjustments (Phase 5) ───────────
+function adjustWater(val) {
+  const input = document.getElementById('checkin-water');
+  if (!input) return;
+  const current = parseFloat(input.value) || 0.0;
+  const target = Math.max(0, current + val);
+  input.value = target.toFixed(1);
+}
+
+function selectEnergyLevel(level) {
+  const input = document.getElementById('checkin-energy-val');
+  if (!input) return;
+  
+  input.value = level;
+  
+  // Update UI selection classes
+  document.querySelectorAll('.energy-selector-grid .energy-btn').forEach(btn => {
+    btn.classList.toggle('selected', parseInt(btn.dataset.level, 10) === level);
+  });
+}
+
+function toggleWorkoutDuration() {
+  const checkbox = document.getElementById('checkin-workout-completed');
+  const wrapper = document.getElementById('checkin-workout-duration-wrapper');
+  if (!checkbox || !wrapper) return;
+  
+  wrapper.style.display = checkbox.checked ? 'block' : 'none';
+}
+
+// ─── Daily Check-In: Save Form (Phase 5) ─────────────────────────────
+async function saveCheckin(e) {
+  e.preventDefault();
+
+  const msg = document.getElementById('checkin-msg');
+  if (msg) {
+    msg.textContent = '';
+    msg.className = 'msg';
+  }
+
+  const weight = document.getElementById('checkin-weight').value;
+  const steps_count = document.getElementById('checkin-steps').value;
+  const water_intake_l = document.getElementById('checkin-water').value;
+  const workout_completed = document.getElementById('checkin-workout-completed').checked;
+  const workout_duration_mins = document.getElementById('checkin-workout-duration').value;
+  const energy_level = document.getElementById('checkin-energy-val').value;
+  const notes = document.getElementById('checkin-notes').value;
+
+  // Client-side validations
+  if (!energy_level) {
+    if (msg) {
+      msg.textContent = 'Please select your energy level today.';
+      msg.className = 'msg error';
+    }
+    return;
+  }
+
+  const payload = {
+    weight: weight !== '' ? parseFloat(weight) : null,
+    steps_count: steps_count !== '' ? parseInt(steps_count, 10) : null,
+    water_intake_l: water_intake_l !== '' ? parseFloat(water_intake_l) : null,
+    workout_completed: !!workout_completed,
+    workout_duration_mins: workout_duration_mins !== '' ? parseInt(workout_duration_mins, 10) : null,
+    energy_level: parseInt(energy_level, 10),
+    notes: notes || null
+  };
+
+  try {
+    const result = await apiPost('/api/checkin', payload);
+    if (result.success) {
+      showToast('Daily check-in saved ✓');
+      
+      // Reload relevant data stores
+      loadGoals();
+      loadJourney();
+      loadAnalytics();
+      loadCheckin();
+      loadHealthScore();
+    } else {
+      if (msg) {
+        msg.textContent = result.message || 'Validation error.';
+        msg.className = 'msg error';
+      }
+    }
+  } catch (err) {
+    console.error(err);
+    if (msg) {
+      msg.textContent = 'Network error. Please try again.';
+      msg.className = 'msg error';
+    }
+  }
+}
+
+// ─── Health Score: Load Data (Phase 6) ───────────────────────────────
+async function loadHealthScore() {
+  const container = document.getElementById('healthscore-main-area');
+  const badgeContainer = document.getElementById('healthscore-badge-container');
+  if (!container) return;
+
+  if (badgeContainer) badgeContainer.innerHTML = '';
+  container.innerHTML = `
+    <div style="text-align:center;padding:50px 0;color:rgba(255,255,255,0.4);">
+      <i class="fas fa-spinner fa-spin" style="font-size:2rem;margin-bottom:12px;"></i>
+      <p>Calculating your dynamic health score...</p>
+    </div>`;
+
+  try {
+    const response = await fetch('/api/healthscore').then(r => r.json());
+    if (response.success) {
+      renderHealthScoreView(response);
+    } else {
+      container.innerHTML = `
+        <div class="journey-empty-card">
+          <i class="fas fa-circle-exclamation" style="color:var(--danger-red);"></i>
+          <h3>Failed to calculate health score</h3>
+          <p>${response.message || 'Please refresh the page.'}</p>
+        </div>`;
+    }
+  } catch (err) {
+    console.error(err);
+    container.innerHTML = `
+      <div class="journey-empty-card">
+        <i class="fas fa-circle-exclamation" style="color:var(--danger-red);"></i>
+        <h3>Connection error</h3>
+        <p>Could not connect to server. Please try again.</p>
+      </div>`;
+  }
+}
+
+// ─── Health Score: Render Dashboard (Phase 6) ────────────────────────
+function renderHealthScoreView(data) {
+  const container = document.getElementById('healthscore-main-area');
+  const badgeContainer = document.getElementById('healthscore-badge-container');
+  if (!container) return;
+
+  const score = data.healthScore;
+  const rating = data.rating;
+  const breakdown = data.breakdown || {};
+  const tips = data.tips || [];
+
+  // 1. Update header rating badge
+  const ratingClass = rating.toLowerCase().replace(' ', '-');
+  if (badgeContainer) {
+    badgeContainer.innerHTML = `<span class="badge-status-${ratingClass === 'needs-attention' ? 'behind' : (ratingClass === 'fair' ? 'behind' : (ratingClass === 'good' ? 'ontrack' : 'ahead'))}" style="padding: 6px 14px; font-weight: 800; font-size: 11px;">${rating}</span>`;
+  }
+
+  // Calculate SVG circular parameters
+  // Circle radius r = 70, stroke-width = 12. Circumference = 2 * PI * r = 2 * 3.14159 * 70 = 439.8
+  const radius = 70;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (score / 100) * circumference;
+
+  // Render Layout
+  container.innerHTML = `
+    <div class="analytics-grid">
+      <!-- Column A: Circular SVG Gauge & Tips -->
+      <div class="metrics-panel-stack">
+        
+        <!-- Score Circular Gauge Card -->
+        <div class="analytics-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 24px;">
+          <h3>Health Score Gauge</h3>
+          
+          <div class="healthscore-circle-container">
+            <svg class="healthscore-circle-svg" viewBox="0 0 160 160">
+              <circle cx="80" cy="80" r="${radius}" class="healthscore-circle-bg" />
+              <circle cx="80" cy="80" r="${radius}" class="healthscore-circle-progress ${ratingClass}"
+                      stroke-dasharray="${circumference}" 
+                      stroke-dashoffset="${circumference}" />
+            </svg>
+            <div class="healthscore-center-text">
+              <span class="score-number" id="healthscore-number-val">0</span>
+              <span class="score-rating badge-rating-${ratingClass}" style="margin-top: 4px;">${rating}</span>
+            </div>
+          </div>
+          <div style="font-size: 13px; color: rgba(255,255,255,0.45); text-align: center; max-width: 250px; line-height: 1.4; margin-top: 8px;">
+            Deterministic index calculated from goals, daily checks, streaks, and hydration.
+          </div>
+        </div>
+
+        <!-- Suggestions & Action Items checklist -->
+        <div class="analytics-card">
+          <h3>Optimization Suggestion List</h3>
+          ${tips.length > 0 ? `
+            <div class="healthscore-tips-list">
+              ${tips.map(t => `
+                <div class="healthscore-tip-item">
+                  <span>${escapeHtml(t.tip)}</span>
+                  <span class="points">+${t.points.toFixed(1)} pts</span>
+                </div>
+              `).join('')}
+            </div>
+          ` : `
+            <div style="text-align: center; padding: 20px; opacity: 0.5;">
+              <i class="fas fa-crown" style="font-size: 32px; color: var(--warning-gold); margin-bottom: 8px;"></i>
+              <p style="font-size: 13px; margin: 0; font-weight: 600; color: var(--primary-teal);">Excellent progress! You have locked in all target points today.</p>
+            </div>
+          `}
+        </div>
+      </div>
+
+      <!-- Column B: Deterministic Sub-score Cards Breakdown -->
+      <div class="metrics-panel-stack">
+        <div class="analytics-card" style="padding: 24px 28px;">
+          <h3>Deterministic Component Breakdown</h3>
+          
+          <div class="metrics-panel-stack" style="gap: 16px;">
+            ${Object.entries(breakdown).map(([key, item]) => {
+              const compTitles = {
+                goalProgress: { title: 'Goal Progress', icon: 'fa-bullseye', colorClass: 'excellent' },
+                dailyActivity: { title: 'Daily Activity', icon: 'fa-person-running', colorClass: 'excellent' },
+                workoutConsistency: { title: 'Workout Consistency', icon: 'fa-calendar-check', colorClass: 'excellent' },
+                hydration: { title: 'Daily Hydration', icon: 'fa-droplet', colorClass: 'excellent' },
+                energyLevels: { title: 'Energy Levels', icon: 'fa-bolt', colorClass: 'excellent' },
+                checkinStreaks: { title: 'Check-In Streaks', icon: 'fa-fire', colorClass: 'excellent' }
+              }[key] || { title: key, icon: 'fa-question', colorClass: 'excellent' };
+
+              const scoreVal = item.score;
+
+              return `
+                <div class="analytics-card healthscore-breakdown-card" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 16px; border-radius: 16px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                    <span style="font-size:14px; font-weight:700; display:flex; align-items:center; gap: 8px;">
+                      <i class="fas ${compTitles.icon}" style="color:var(--primary-teal); width: 16px; text-align: center;"></i>
+                      ${compTitles.title}
+                    </span>
+                    <span style="font-size: 14px; font-weight: 800; color: ${scoreVal >= 80 ? 'var(--primary-teal)' : (scoreVal >= 60 ? 'var(--warning-gold)' : 'var(--danger-red)')};">
+                      ${scoreVal}/100
+                    </span>
+                  </div>
+                  
+                  <div style="font-size: 11.5px; color: rgba(255,255,255,0.45); display: flex; justify-content: space-between; margin-bottom: 6px;">
+                    <span>Metric: ${escapeHtml(item.value)}</span>
+                    <span>Target: ${escapeHtml(item.target)}</span>
+                  </div>
+                  
+                  <div class="analytics-progress-bg" style="height: 4px; margin-bottom: 10px;">
+                    <div class="analytics-progress-fill" style="width: ${scoreVal}%; background: ${scoreVal >= 80 ? 'var(--primary-teal)' : (scoreVal >= 60 ? 'var(--warning-gold)' : 'var(--danger-red)')};"></div>
+                  </div>
+
+                  <p style="margin: 0; font-size: 12.5px; line-height: 1.4; color: rgba(255,255,255,0.7); font-style: italic;">
+                    ${escapeHtml(item.explanation)}
+                  </p>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Animate Circular Gauge circle from 0 to target offset
+  setTimeout(() => {
+    const circle = container.querySelector('.healthscore-circle-progress');
+    if (circle) {
+      circle.style.strokeDashoffset = strokeDashoffset;
+    }
+    
+    // Animate the text counter in the center
+    const numVal = document.getElementById('healthscore-number-val');
+    if (numVal) {
+      let currentNum = 0;
+      const stepTime = Math.abs(Math.floor(1000 / score));
+      const timer = setInterval(() => {
+        if (currentNum >= score) {
+          numVal.textContent = score;
+          clearInterval(timer);
+        } else {
+          currentNum++;
+          numVal.textContent = currentNum;
+        }
+      }, Math.max(10, stepTime));
+    }
+  }, 100);
 }
 
  

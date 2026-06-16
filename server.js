@@ -11,6 +11,19 @@ const PORT = process.env.PORT || 3000;
 // ─── PostgreSQL Connection ────────────────────────────────────────
 const pool = db.pool;
 
+// ─── Database Migration: Daily Check-In (Phase 5) ──────────────────
+(async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE progress_logs 
+      ADD COLUMN IF NOT EXISTS energy_level INTEGER CHECK (energy_level >= 1 AND energy_level <= 5)
+    `);
+    console.log('✅ Daily Check-in database migrations completed.');
+  } catch (err) {
+    console.error('❌ Daily Check-in database migration error:', err);
+  }
+})();
+
 // ─── Middleware ───────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -713,6 +726,585 @@ app.get('/api/progress/analytics', async (req, res) => {
         insights: forecastInsights
       },
       weightHistory
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.json({ success: false, message: 'Server error. Please try again.' });
+  }
+});
+
+// ─── Local Date String Helper ──────────────────────────────────────
+function getLocalDateString(d) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// ─── Streaks Calculator (Phase 5) ──────────────────────────────────
+function calculateStreaks(dates) {
+  if (!dates || dates.length === 0) {
+    return { currentStreak: 0, bestStreak: 0 };
+  }
+
+  const parseLocalDate = (dateStr) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  const sortedDates = dates.map(parseLocalDate).sort((a, b) => a - b);
+
+  let bestStreak = 1;
+  let currentStreak = 0;
+  let tempStreak = 1;
+
+  for (let i = 1; i < sortedDates.length; i++) {
+    const diffTime = sortedDates[i] - sortedDates[i - 1];
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 1) {
+      tempStreak++;
+    } else if (diffDays > 1) {
+      bestStreak = Math.max(bestStreak, tempStreak);
+      tempStreak = 1;
+    }
+  }
+  bestStreak = Math.max(bestStreak, tempStreak);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const dateStrings = dates.map(d => d.trim());
+  const todayStr = getLocalDateString(today);
+  const yesterdayStr = getLocalDateString(yesterday);
+
+  const hasToday = dateStrings.includes(todayStr);
+  const hasYesterday = dateStrings.includes(yesterdayStr);
+
+  if (hasToday || hasYesterday) {
+    currentStreak = 1;
+    let refDate = hasToday ? today : yesterday;
+
+    while (true) {
+      const prevDate = new Date(refDate);
+      prevDate.setDate(prevDate.getDate() - 1);
+      const prevDateStr = getLocalDateString(prevDate);
+
+      if (dateStrings.includes(prevDateStr)) {
+        currentStreak++;
+        refDate = prevDate;
+      } else {
+        break;
+      }
+    }
+  } else {
+    currentStreak = 0;
+  }
+
+  return { currentStreak, bestStreak };
+}
+
+// ─── Daily Check-In: Fetch Today's Log & Streaks (Phase 5) ───────────
+app.get('/api/checkin/today', async (req, res) => {
+  if (!req.session.user)
+    return res.json({ success: false, message: 'Not logged in.' });
+
+  try {
+    const userId = req.session.user.id;
+    const todayStr = getLocalDateString(new Date());
+
+    // 1. Fetch today's check-in
+    const checkinRes = await pool.query(
+      `SELECT * FROM progress_logs
+       WHERE user_id = $1 AND log_date = $2 LIMIT 1`,
+      [userId, todayStr]
+    );
+
+    // 2. Fetch all log dates for streaks
+    const datesRes = await pool.query(
+      `SELECT DISTINCT log_date::text FROM progress_logs
+       WHERE user_id = $1
+       ORDER BY log_date::text ASC`,
+      [userId]
+    );
+
+    const dates = datesRes.rows.map(row => row.log_date);
+    const streak = calculateStreaks(dates);
+
+    if (checkinRes.rows.length === 0) {
+      return res.json({ success: true, logged: false, streak });
+    }
+
+    const row = checkinRes.rows[0];
+    res.json({
+      success: true,
+      logged: true,
+      streak,
+      data: {
+        weight: row.weight ? parseFloat(row.weight) : null,
+        water_intake_l: row.water_intake_ml ? parseFloat((row.water_intake_ml / 1000).toFixed(2)) : null,
+        steps_count: row.steps_count !== null ? parseInt(row.steps_count, 10) : null,
+        workout_completed: row.workout_completed || false,
+        workout_duration_mins: row.workout_duration_mins !== null ? parseInt(row.workout_duration_mins, 10) : null,
+        energy_level: row.energy_level ? parseInt(row.energy_level, 10) : null,
+        notes: row.notes || ''
+      }
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.json({ success: false, message: 'Server error. Please try again.' });
+  }
+});
+
+// ─── Daily Check-In: Save Log (Phase 5) ──────────────────────────────
+app.post('/api/checkin', async (req, res) => {
+  if (!req.session.user)
+    return res.json({ success: false, message: 'Not logged in.' });
+
+  try {
+    const userId = req.session.user.id;
+    const {
+      weight,
+      water_intake_l,
+      steps_count,
+      workout_completed,
+      workout_duration_mins,
+      energy_level,
+      notes
+    } = req.body;
+
+    // Server-side Validation
+    if (weight !== undefined && weight !== null && weight !== '') {
+      const wVal = parseFloat(weight);
+      if (isNaN(wVal) || wVal <= 0 || wVal > 500) {
+        return res.json({ success: false, message: 'Invalid weight (must be between 0 and 500 kg).' });
+      }
+    }
+
+    if (water_intake_l !== undefined && water_intake_l !== null && water_intake_l !== '') {
+      const waterVal = parseFloat(water_intake_l);
+      if (isNaN(waterVal) || waterVal < 0 || waterVal > 20) {
+        return res.json({ success: false, message: 'Invalid water intake (must be between 0 and 20 L).' });
+      }
+    }
+
+    if (steps_count !== undefined && steps_count !== null && steps_count !== '') {
+      const stepsVal = parseInt(steps_count, 10);
+      if (isNaN(stepsVal) || stepsVal < 0 || stepsVal > 100000) {
+        return res.json({ success: false, message: 'Invalid steps count (must be between 0 and 100,000).' });
+      }
+    }
+
+    if (workout_duration_mins !== undefined && workout_duration_mins !== null && workout_duration_mins !== '') {
+      const durVal = parseInt(workout_duration_mins, 10);
+      if (isNaN(durVal) || durVal < 0 || durVal > 1440) {
+        return res.json({ success: false, message: 'Invalid workout duration (must be between 0 and 1440 minutes).' });
+      }
+    }
+
+    if (energy_level !== undefined && energy_level !== null && energy_level !== '') {
+      const elVal = parseInt(energy_level, 10);
+      if (isNaN(elVal) || elVal < 1 || elVal > 5) {
+        return res.json({ success: false, message: 'Invalid energy level (must be between 1 and 5).' });
+      }
+    } else {
+      return res.json({ success: false, message: 'Energy level is required.' });
+    }
+
+    if (notes && notes.length > 500) {
+      return res.json({ success: false, message: 'Notes must be less than 500 characters.' });
+    }
+
+    const water_ml = (water_intake_l !== undefined && water_intake_l !== null && water_intake_l !== '')
+      ? Math.round(parseFloat(water_intake_l) * 1000)
+      : null;
+    const parsedWeight = (weight !== undefined && weight !== null && weight !== '') ? parseFloat(weight) : null;
+    const parsedSteps = (steps_count !== undefined && steps_count !== null && steps_count !== '') ? parseInt(steps_count, 10) : null;
+    const isWorkoutDone = !!workout_completed;
+    const parsedDuration = (isWorkoutDone && workout_duration_mins !== undefined && workout_duration_mins !== null && workout_duration_mins !== '')
+      ? parseInt(workout_duration_mins, 10)
+      : 0;
+    const parsedEnergy = parseInt(energy_level, 10);
+    const sanitizedNotes = notes ? notes.trim() : '';
+
+    const todayStr = getLocalDateString(new Date());
+
+    await pool.query(
+      `INSERT INTO progress_logs 
+       (user_id, log_date, weight, water_intake_ml, steps_count, workout_completed, workout_duration_mins, energy_level, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (user_id, log_date)
+       DO UPDATE SET 
+         weight = COALESCE(EXCLUDED.weight, progress_logs.weight),
+         water_intake_ml = EXCLUDED.water_intake_ml,
+         steps_count = EXCLUDED.steps_count,
+         workout_completed = EXCLUDED.workout_completed,
+         workout_duration_mins = EXCLUDED.workout_duration_mins,
+         energy_level = EXCLUDED.energy_level,
+         notes = EXCLUDED.notes`,
+      [userId, todayStr, parsedWeight, water_ml, parsedSteps, isWorkoutDone, parsedDuration, parsedEnergy, sanitizedNotes]
+    );
+
+    if (parsedWeight !== null) {
+      await pool.query(
+        `INSERT INTO user_profiles (user_id, age, height_cm) 
+         VALUES ($1, NULL, NULL)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [userId]
+      );
+      req.session.user.weight = parsedWeight;
+    }
+
+    res.json({ success: true, message: 'Daily check-in logged successfully.' });
+
+  } catch (err) {
+    console.error(err);
+    res.json({ success: false, message: 'Server error. Please try again.' });
+  }
+});
+
+// ─── Health Score: Deterministic Dynamic Calculations (Phase 6) ──────
+app.get('/api/healthscore', async (req, res) => {
+  if (!req.session.user)
+    return res.json({ success: false, message: 'Not logged in.' });
+
+  try {
+    const userId = req.session.user.id;
+    const todayStr = getLocalDateString(new Date());
+
+    // 1. Fetch active goal
+    const goalRes = await pool.query(
+      `SELECT * FROM goals WHERE user_id = $1 AND status = 'active' LIMIT 1`,
+      [userId]
+    );
+    const activeGoal = goalRes.rows.length > 0 ? goalRes.rows[0] : null;
+
+    // 2. Fetch today's check-in
+    const todayLogRes = await pool.query(
+      `SELECT * FROM progress_logs
+       WHERE user_id = $1 AND log_date = $2 LIMIT 1`,
+      [userId, todayStr]
+    );
+    const todayLog = todayLogRes.rows.length > 0 ? todayLogRes.rows[0] : null;
+
+    // 3. Fetch all check-in dates for streak calculations
+    const datesRes = await pool.query(
+      `SELECT DISTINCT log_date::text FROM progress_logs
+       WHERE user_id = $1
+       ORDER BY log_date::text ASC`,
+      [userId]
+    );
+    const logDates = datesRes.rows.map(row => row.log_date);
+    const { currentStreak } = calculateStreaks(logDates);
+
+    // 4. Fetch past 7 days logs for consistency calculations
+    const last7DaysRes = await pool.query(
+      `SELECT workout_completed FROM progress_logs
+       WHERE user_id = $1 AND log_date >= CURRENT_DATE - INTERVAL '6 days'
+       AND workout_completed = TRUE`,
+      [userId]
+    );
+    const completedWorkoutsThisWeek = last7DaysRes.rows.length;
+
+    // 5. Fetch 30-day energy levels average as a fallback
+    const energyAvgRes = await pool.query(
+      `SELECT AVG(energy_level) as avg_energy FROM progress_logs
+       WHERE user_id = $1 AND log_date >= CURRENT_DATE - INTERVAL '29 days'
+       AND energy_level IS NOT NULL`,
+      [userId]
+    );
+    const avgEnergy = energyAvgRes.rows.length > 0 && energyAvgRes.rows[0].avg_energy !== null
+      ? parseFloat(energyAvgRes.rows[0].avg_energy)
+      : 3.0; // default to neutral (3) if no logs exist
+
+    // 6. Fetch 30-day logs (needed to calculate velocity/schedule variance for Goal Progress)
+    const logsRes = await pool.query(
+      `SELECT log_date::text, weight FROM progress_logs
+       WHERE user_id = $1 AND log_date >= CURRENT_DATE - INTERVAL '29 days'
+       AND weight IS NOT NULL
+       ORDER BY log_date ASC`,
+      [userId]
+    );
+    const weightHistory = logsRes.rows.map(row => ({
+      log_date: row.log_date,
+      weight: parseFloat(row.weight)
+    }));
+
+    // 7. Fetch latest weight
+    const latestWeightRes = await pool.query(
+      `SELECT weight FROM progress_logs
+       WHERE user_id = $1 AND weight IS NOT NULL
+       ORDER BY log_date DESC, created_at DESC LIMIT 1`,
+      [userId]
+    );
+    const sw = activeGoal ? parseFloat(activeGoal.start_weight) : null;
+    const tw = activeGoal ? parseFloat(activeGoal.target_weight) : null;
+    const currentWeight = latestWeightRes.rows.length > 0
+      ? parseFloat(latestWeightRes.rows[0].weight)
+      : (sw || null);
+
+    // ─────────────────────────────────────────────────────────────────
+    // COMPONENT A: GOAL PROGRESS (25% weight)
+    // ─────────────────────────────────────────────────────────────────
+    let goalScore = 60;
+    let goalValueText = 'No active goal';
+    let goalTargetText = 'Set an active goal';
+    let goalExplanation = 'Setting an active goal parameters provides a clear endpoint for your health journey and structures your score roadmap.';
+
+    if (activeGoal) {
+      goalTargetText = `${activeGoal.target_weight} kg`;
+      
+      if (activeGoal.goal_type === 'maintenance') {
+        const deviation = Math.abs(currentWeight - tw);
+        goalValueText = `${currentWeight.toFixed(1)} kg`;
+        
+        if (deviation <= 2) {
+          goalScore = 100;
+          goalExplanation = `Your current weight (${currentWeight.toFixed(1)} kg) is within your stability target zone (+/- 2 kg of ${tw} kg). Excellent maintenance control!`;
+        } else {
+          goalScore = Math.max(0, Math.round(100 - (deviation - 2) * 10));
+          goalExplanation = `Your current weight (${currentWeight.toFixed(1)} kg) is outside your stability zone (+/- 2 kg of ${tw} kg). Work on alignment to regain score points.`;
+        }
+      } else {
+        // weight_loss or muscle_gain
+        // Retrieve schedule variance from velocity calculation logic
+        const startDate = new Date(activeGoal.start_date);
+        const targetDate = new Date(activeGoal.target_date);
+        const today = new Date(); today.setHours(0,0,0,0);
+        
+        const daysRemaining = Math.max(0, Math.round((targetDate - today) / (1000 * 60 * 60 * 24)));
+        const weightLogsCount = weightHistory.length;
+        
+        let weeklyRate = 0;
+        let isMovingTowardsGoal = false;
+        let rateTowardsGoal = 0;
+        
+        if (weightLogsCount >= 2) {
+          const earliest = weightHistory[0];
+          const latest = weightHistory[weightLogsCount - 1];
+          const dateDiffDays = Math.round((new Date(latest.log_date) - new Date(earliest.log_date)) / (1000 * 60 * 60 * 24));
+          
+          if (dateDiffDays >= 3) {
+            const weightDiff = latest.weight - earliest.weight;
+            weeklyRate = Math.round((weightDiff / dateDiffDays * 7) * 100) / 100;
+            
+            if (activeGoal.goal_type === 'weight_loss' && weeklyRate < 0) {
+              isMovingTowardsGoal = true;
+              rateTowardsGoal = -weeklyRate;
+            } else if (activeGoal.goal_type === 'muscle_gain' && weeklyRate > 0) {
+              isMovingTowardsGoal = true;
+              rateTowardsGoal = weeklyRate;
+            }
+          }
+        }
+        
+        if (isMovingTowardsGoal && rateTowardsGoal > 0) {
+          const weightRemaining = Math.abs(currentWeight - tw);
+          const estDaysRemaining = Math.ceil(weightRemaining / (rateTowardsGoal / 7));
+          const daysDifference = daysRemaining - estDaysRemaining;
+          
+          goalValueText = daysDifference > 0 ? `${daysDifference} days ahead` : `${Math.abs(daysDifference)} days behind`;
+          
+          if (daysDifference >= -3) {
+            goalScore = 100;
+            goalExplanation = `Your weight velocity (${Math.abs(weeklyRate).toFixed(2)} kg/week) is on track. Projected to hit target weight ${daysDifference > 0 ? daysDifference + ' days ahead' : 'close to'} schedule.`;
+          } else {
+            const behindDays = Math.abs(daysDifference);
+            goalScore = Math.max(20, Math.round(100 - behindDays * 2));
+            goalExplanation = `Your weight velocity (${Math.abs(weeklyRate).toFixed(2)} kg/week) is behind target by ${Math.round(behindDays)} days. Adjust active thresholds.`;
+          }
+        } else {
+          goalValueText = 'Velocity lagging';
+          goalScore = 60;
+          if (weightLogsCount < 2) {
+            goalExplanation = 'Insufficient logs to determine schedule velocity. Log weight at least twice over a 3-day window to evaluate.';
+          } else {
+            goalExplanation = `Your weight trend (${weeklyRate > 0 ? '+' : ''}${weeklyRate} kg/week) is stable or moving away from your goal parameters. Check consistency inputs.`;
+          }
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // COMPONENT B: DAILY ACTIVITY (20% weight)
+    // ─────────────────────────────────────────────────────────────────
+    let activityScore = 0;
+    const stepsLogged = todayLog ? parseInt(todayLog.steps_count || 0, 10) : 0;
+    const durationLogged = todayLog ? parseInt(todayLog.workout_duration_mins || 0, 10) : 0;
+    
+    const stepsPart = Math.min(100, (stepsLogged / 10000) * 100);
+    const durationPart = Math.min(100, (durationLogged / 30) * 100);
+    activityScore = Math.round(0.60 * stepsPart + 0.40 * durationPart);
+    
+    const activityValueText = `${stepsLogged.toLocaleString()} steps, ${durationLogged} mins`;
+    const activityTargetText = '10,000 steps, 30 mins';
+    let activityExplanation = `You walked ${stepsLogged.toLocaleString()} steps (target: 10,000) and completed ${durationLogged} minutes of active exercise (target: 30) today.`;
+    
+    if (stepsLogged === 0 && durationLogged === 0) {
+      activityExplanation = 'No movement logged today. Complete a workout or log steps in your check-in to unlock daily activity points.';
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // COMPONENT C: WORKOUT CONSISTENCY (20% weight)
+    // ─────────────────────────────────────────────────────────────────
+    const consistencyScore = Math.round(Math.min(100, (completedWorkoutsThisWeek / 3) * 100));
+    const consistencyValueText = `${completedWorkoutsThisWeek} workouts`;
+    const consistencyTargetText = '3 workouts / week';
+    const consistencyExplanation = `You completed ${completedWorkoutsThisWeek} workout sessions in the past 7 days (target: 3 per week). Regular structured training improves health parameters.`;
+
+    // ─────────────────────────────────────────────────────────────────
+    // COMPONENT D: HYDRATION (15% weight)
+    // ─────────────────────────────────────────────────────────────────
+    const waterMl = todayLog ? parseInt(todayLog.water_intake_ml || 0, 10) : 0;
+    const waterL = parseFloat((waterMl / 1000).toFixed(2));
+    const hydrationScore = Math.round(Math.min(100, (waterL / 3.0) * 100));
+    const hydrationValueText = `${waterL} L`;
+    const hydrationTargetText = '3.0 L';
+    let hydrationExplanation = `You logged ${waterL} L of water today (target: 3.0 L). Proper hydration is essential for cellular recovery and physical energy.`;
+    
+    if (waterL === 0) {
+      hydrationExplanation = 'No hydration logged today. Log water cups in your check-in to unlock points and keep metabolism primed.';
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // COMPONENT E: ENERGY LEVELS (5% weight)
+    // ─────────────────────────────────────────────────────────────────
+    const energyVal = todayLog ? todayLog.energy_level : null;
+    const finalEnergy = energyVal !== null ? energyVal : avgEnergy;
+    const energyScore = Math.round((finalEnergy / 5) * 100);
+    
+    const energyLabels = { 1: 'Exhausted', 2: 'Tired', 3: 'Normal', 4: 'Energetic', 5: 'Peak' };
+    const energyValueText = energyVal !== null ? `${energyVal}/5 (${energyLabels[energyVal]})` : `${finalEnergy.toFixed(1)}/5 (Avg)`;
+    const energyTargetText = '5/5 (Peak)';
+    let energyExplanation = `Your subjective energy level is rated as ${energyLabels[Math.round(finalEnergy)]} (${finalEnergy.toFixed(1)}/5) today.`;
+    
+    if (energyVal === null) {
+      energyExplanation = `No check-in rating logged today; falling back to 30-day average energy level (${finalEnergy.toFixed(1)}/5).`;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // COMPONENT F: CHECK-IN STREAKS (15% weight)
+    // ─────────────────────────────────────────────────────────────────
+    const streakScore = Math.round(Math.min(100, (currentStreak / 7) * 100));
+    const streakValueText = `${currentStreak} ${currentStreak === 1 ? 'day' : 'days'}`;
+    const streakTargetText = '7 days';
+    const streakExplanation = `Your current check-in streak is ${currentStreak} consecutive ${currentStreak === 1 ? 'day' : 'days'}. Logging daily habits locks in score points.`;
+
+    // ─────────────────────────────────────────────────────────────────
+    // OVERALL HEALTH SCORE CALCULATION
+    // ─────────────────────────────────────────────────────────────────
+    const totalScore = Math.round(
+      0.25 * goalScore +
+      0.20 * activityScore +
+      0.20 * consistencyScore +
+      0.15 * hydrationScore +
+      0.05 * energyScore +
+      0.15 * streakScore
+    );
+
+    // Determine category rating
+    let rating = 'Needs Attention';
+    if (totalScore >= 90) rating = 'Elite';
+    else if (totalScore >= 80) rating = 'Excellent';
+    else if (totalScore >= 70) rating = 'Good';
+    else if (totalScore >= 60) rating = 'Fair';
+
+    // ─────────────────────────────────────────────────────────────────
+    // DETERMINISTIC ACTION SUGGESTIONS & POINTS CALCULATION
+    // ─────────────────────────────────────────────────────────────────
+    const tips = [];
+    
+    if (stepsPart < 100) {
+      const stepsRem = 10000 - stepsLogged;
+      const stepPts = Math.round((0.20 * 0.60 * (stepsRem / 10000) * 100) * 10) / 10;
+      if (stepPts > 0) {
+        tips.push({ tip: `Walk ${stepsRem.toLocaleString()} more steps today`, points: stepPts });
+      }
+    }
+    
+    if (durationPart < 100) {
+      const durRem = 30 - durationLogged;
+      const durPts = Math.round((0.20 * 0.40 * (durRem / 30) * 100) * 10) / 10;
+      if (durPts > 0) {
+        tips.push({ tip: `Exercise for ${durRem} more minutes today`, points: durPts });
+      }
+    }
+    
+    if (completedWorkoutsThisWeek < 3) {
+      const consistencyPts = Math.round((0.20 * (1 / 3) * 100) * 10) / 10;
+      tips.push({ tip: `Complete your next workout session this week`, points: consistencyPts });
+    }
+    
+    if (waterL < 3.0) {
+      const waterRem = parseFloat((3.0 - waterL).toFixed(1));
+      const waterPts = Math.round((0.15 * (waterRem / 3.0) * 100) * 10) / 10;
+      if (waterPts > 0) {
+        tips.push({ tip: `Drink ${waterRem} L more water today`, points: waterPts });
+      }
+    }
+    
+    if (currentStreak < 7) {
+      const streakPts = Math.round((0.15 * (1 / 7) * 100) * 10) / 10;
+      tips.push({ tip: `Log check-in tomorrow to advance streak`, points: streakPts });
+    }
+    
+    if (!activeGoal) {
+      tips.push({ tip: `Set an active fitness or weight goal`, points: 10.0 });
+    }
+
+    res.json({
+      success: true,
+      healthScore: totalScore,
+      rating,
+      breakdown: {
+        goalProgress: {
+          score: goalScore,
+          weight: 25,
+          value: goalValueText,
+          target: goalTargetText,
+          explanation: goalExplanation
+        },
+        dailyActivity: {
+          score: activityScore,
+          weight: 20,
+          value: activityValueText,
+          target: activityTargetText,
+          explanation: activityExplanation
+        },
+        workoutConsistency: {
+          score: consistencyScore,
+          weight: 20,
+          value: consistencyValueText,
+          target: consistencyTargetText,
+          explanation: consistencyExplanation
+        },
+        hydration: {
+          score: hydrationScore,
+          weight: 15,
+          value: hydrationValueText,
+          target: hydrationTargetText,
+          explanation: hydrationExplanation
+        },
+        energyLevels: {
+          score: energyScore,
+          weight: 5,
+          value: energyValueText,
+          target: energyTargetText,
+          explanation: energyExplanation
+        },
+        checkinStreaks: {
+          score: streakScore,
+          weight: 15,
+          value: streakValueText,
+          target: streakTargetText,
+          explanation: streakExplanation
+        }
+      },
+      tips
     });
 
   } catch (err) {
