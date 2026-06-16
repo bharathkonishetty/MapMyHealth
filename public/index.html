@@ -81,6 +81,7 @@
     <div class="nav-tabs">
       <button class="nav-tab active" onclick="switchSection('workouts', this)">WORKOUTS</button>
       <button class="nav-tab"        onclick="switchSection('goals', this)">GOALS</button>
+      <button class="nav-tab"        onclick="switchSection('journey', this)">JOURNEY MAP</button>
       <button class="nav-tab"        onclick="switchSection('diet', this)">DIET</button>
       <button class="nav-tab"        onclick="switchSection('about', this)">ABOUT</button>
       <button class="nav-tab"        onclick="switchSection('help', this)">HELP</button>
@@ -481,6 +482,21 @@
       <button class="btn-main" id="btn-goal-submit" onclick="submitGoal()">Create Goal</button>
       <button class="btn-goal-cancel-modal" onclick="closeGoalModal()">Cancel</button>
     </div><!-- /goal-modal -->
+
+
+    <!-- ─── JOURNEY MAP SECTION ───────────────────────────────────── -->
+    <div id="journey" class="section-content">
+      <div class="journey-section-inner">
+        <div class="journey-header">
+          <h2>My Health Journey Map</h2>
+          <div class="journey-route-badge" id="journey-route-badge">Active Route</div>
+        </div>
+
+        <div id="journey-main-area">
+          <!-- Dynamic Journey Layout (Map & Details columns) will be injected here -->
+        </div>
+      </div>
+    </div><!-- /journey -->
 
 
   </div><!-- /dashboard -->

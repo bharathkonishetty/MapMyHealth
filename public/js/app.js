@@ -108,6 +108,7 @@ function showDashboard(user) {
   document.getElementById('u-weight').value = user.weight || '';
 
   loadGoals();
+  loadJourney();
 }
  
 // ─── Save Profile Stats ───────────────────────────────────────────
@@ -117,7 +118,11 @@ async function saveProfile() {
   const weight = document.getElementById('u-weight').value;
  
   const result = await apiPost('/api/profile', { age, height, weight });
-  if (result.success) showToast('Profile updated ✓');
+  if (result.success) {
+    showToast('Profile updated ✓');
+    loadGoals();
+    loadJourney();
+  }
 }
  
 // ─── Toggle Auth Forms ────────────────────────────────────────────
@@ -150,6 +155,10 @@ function switchSection(sectionId, btn) {
   document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
   document.getElementById(sectionId).classList.add('active');
   if (btn) btn.classList.add('active');
+
+  if (sectionId === 'journey') {
+    loadJourney();
+  }
 }
  
 // ─── Select Workout Day ───────────────────────────────────────────
@@ -537,6 +546,7 @@ async function submitGoal() {
   if (result.success) {
     closeGoalModal();
     await loadGoals();
+    loadJourney();
     showToast(editId ? '✓ Goal updated.' : '✓ Goal created! Your journey has begun.');
   } else {
     msg.textContent = result.message;
@@ -557,6 +567,7 @@ async function updateGoalStatus(goalId, status) {
 
   if (result.success) {
     await loadGoals();
+    loadJourney();
     showToast(status === 'completed' ? '🎉 Goal completed! Well done.' : 'Goal cancelled.');
   } else {
     showToast('Error: ' + result.message);
@@ -590,4 +601,289 @@ document.addEventListener('keydown', (e) => {
   if (loginForm && !loginForm.classList.contains('hidden')) login();
   else if (regForm && !regForm.classList.contains('hidden')) register();
 });
+
+// ─── Journey Map: Load (Phase 3) ───────────────────────────────────
+async function loadJourney() {
+  const container = document.getElementById('journey-main-area');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div style="text-align:center;padding:50px 0;color:rgba(255,255,255,0.4);">
+      <i class="fas fa-spinner fa-spin" style="font-size:2rem;margin-bottom:12px;"></i>
+      <p>Loading your health journey map...</p>
+    </div>`;
+
+  try {
+    const response = await fetch('/api/journey/map').then(r => r.json());
+    if (response.success) {
+      renderJourney(response);
+    } else {
+      container.innerHTML = `
+        <div class="journey-empty-card">
+          <i class="fas fa-circle-exclamation" style="color:var(--danger-red);"></i>
+          <h3>Failed to load journey map</h3>
+          <p>${response.message || 'Please refresh the page.'}</p>
+        </div>`;
+    }
+  } catch (err) {
+    console.error(err);
+    container.innerHTML = `
+      <div class="journey-empty-card">
+        <i class="fas fa-circle-exclamation" style="color:var(--danger-red);"></i>
+        <h3>Connection error</h3>
+        <p>Could not connect to server. Please try again.</p>
+      </div>`;
+  }
+}
+
+// ─── Journey Map: Render (Phase 3) ─────────────────────────────────
+function renderJourney(data) {
+  const container = document.getElementById('journey-main-area');
+  const badge = document.getElementById('journey-route-badge');
+  if (!container) return;
+
+  if (!data.activeGoal) {
+    if (badge) badge.style.display = 'none';
+    container.innerHTML = `
+      <div class="journey-empty-card">
+        <i class="fas fa-map-location-dot"></i>
+        <h3>No Active Journey</h3>
+        <p>Your journey map represents a visual route from where you are to your destination. Set an active goal to generate your route.</p>
+        <button class="btn-main" style="width:auto;padding:12px 28px;" onclick="switchSection('goals', document.querySelector('.nav-tab[onclick*=\\'goals\\']'))">
+          <i class="fas fa-plus"></i>&nbsp; Set My Active Goal
+        </button>
+      </div>`;
+    return;
+  }
+
+  if (badge) {
+    badge.style.display = 'block';
+    badge.textContent = `${data.activeGoal.goal_type.replace('_', ' ')} Route`;
+  }
+
+  const g = data.activeGoal;
+  const milestones = data.checkpoints || [];
+  const cw = data.currentWeight;
+  const progressPct = data.progressPct;
+
+  container.innerHTML = `
+    <div class="journey-grid">
+      <!-- Column A: SVG Winding Trail -->
+      <div class="journey-map-container">
+        <svg class="journey-svg" viewBox="0 0 360 560" xmlns="http://www.w3.org/2000/svg" id="journey-svg-canvas">
+          <defs>
+            <linearGradient id="progress-grad" x1="0%" y1="100%" x2="0%" y2="0%">
+              <stop offset="0%" stop-color="var(--primary-teal)" />
+              <stop offset="100%" stop-color="var(--accent-green)" />
+            </linearGradient>
+            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="5" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+          
+          <!-- Background Winding Trails -->
+          <path class="journey-trail-bg" d="M 180 500 Q 100 445 100 390 Q 180 335 260 280 Q 180 225 100 170 Q 180 115 180 60" />
+          <path class="journey-trail-dash" d="M 180 500 Q 100 445 100 390 Q 180 335 260 280 Q 180 225 100 170 Q 180 115 180 60" />
+          
+          <!-- Glowing Progress Trail -->
+          <path class="journey-trail-progress" id="journey-progress-path" 
+                d="M 180 500 Q 100 445 100 390 Q 180 335 260 280 Q 180 225 100 170 Q 180 115 180 60" 
+                stroke="url(#progress-grad)" />
+          
+          <!-- Plotted Milestones -->
+          ${milestones.map((m, idx) => {
+            const coords = [
+              {x: 180, y: 500}, // Seq 0 - Starting Point
+              {x: 100, y: 390}, // Seq 1 - First Step
+              {x: 260, y: 280}, // Seq 2 - Halfway Hero
+              {x: 100, y: 170}, // Seq 3 - Momentum
+              {x: 180, y: 60}   // Seq 4 - Destination
+            ][idx];
+            
+            const nodeClass = m.is_completed ? 'completed' : 'locked';
+            const nodeRadius = idx === 0 || idx === 4 ? 14 : 10;
+            const dotRadius = idx === 0 || idx === 4 ? 6 : 4;
+            const glowClass = m.is_completed ? 'glow-filter' : '';
+            
+            return `
+              <g class="journey-node ${glowClass}" onclick="showJourneyTooltip('${escapeHtml(m.title)}', '${escapeHtml(m.description)}', ${m.is_completed})">
+                <circle cx="${coords.x}" cy="${coords.y}" r="${nodeRadius}" class="node-bg ${nodeClass}" />
+                <circle cx="${coords.x}" cy="${coords.y}" r="${dotRadius}" class="node-dot ${nodeClass}" />
+              </g>
+            `;
+          }).join('')}
+          
+          <!-- Pulsing Current Position Indicator -->
+          <g class="current-marker" id="journey-current-marker" style="display:none;">
+            <circle cx="0" cy="0" r="13" fill="rgba(20, 184, 166, 0.22)" stroke="var(--primary-teal)" stroke-width="2" />
+            <circle cx="0" cy="0" r="6" fill="var(--primary-teal)" />
+          </g>
+        </svg>
+        
+        <div class="journey-tooltip-box" id="journey-tooltip">
+          <h4 id="tooltip-title">Checkpoint</h4>
+          <p id="tooltip-desc">Description</p>
+          <span class="tooltip-status" id="tooltip-status">Status</span>
+        </div>
+      </div>
+      
+      <!-- Column B: Stats & Insights -->
+      <div class="journey-sidebar">
+        <!-- Route Summary Card -->
+        <div class="journey-card">
+          <h3>Route Summary</h3>
+          <div style="font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:18px;font-weight:600;">
+            Label: ${escapeHtml(g.goal_name || 'My Route')} &nbsp;·&nbsp; Target Date: ${formatDate(g.target_date)}
+          </div>
+          <div class="journey-summary-grid">
+            <div class="journey-summary-item">
+              <div class="label">Start Weight</div>
+              <div class="value">${g.start_weight} kg</div>
+            </div>
+            <div class="journey-summary-item">
+              <div class="label">Current Weight</div>
+              <div class="value highlight">${cw} kg</div>
+            </div>
+            <div class="journey-summary-item">
+              <div class="label">Target Weight</div>
+              <div class="value" style="color:var(--accent-green);">${g.target_weight} kg</div>
+            </div>
+            <div class="journey-summary-item">
+              <div class="label">Overall Progress</div>
+              <div class="value highlight">${progressPct}%</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Timeline Checklist -->
+        <div class="journey-card">
+          <h3>Checkpoints</h3>
+          <div class="timeline-list">
+            ${milestones.map((m, idx) => {
+              const activeClass = !m.is_completed && (idx === 0 || milestones[idx-1]?.is_completed) ? 'active' : '';
+              const completedClass = m.is_completed ? 'completed' : '';
+              
+              let statusIconHTML = '<i class="fas fa-lock timeline-item-status-icon locked"></i>';
+              if (m.is_completed) {
+                statusIconHTML = '<i class="fas fa-check-circle timeline-item-status-icon completed"></i>';
+              } else if (activeClass) {
+                statusIconHTML = '<i class="fas fa-spinner fa-spin timeline-item-status-icon active" style="color:var(--primary-teal);"></i>';
+              }
+              
+              return `
+                <div class="timeline-item ${completedClass} ${activeClass}">
+                  <div class="timeline-item-dot"></div>
+                  <div class="timeline-item-content">
+                    <h4>${escapeHtml(m.title)}</h4>
+                    <p>${escapeHtml(m.description)}</p>
+                  </div>
+                  ${statusIconHTML}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+        
+        <!-- Navigator Guidance Box -->
+        <div class="coach-guidance-box">
+          <i class="fas fa-compass"></i>
+          <div>
+            <p id="navigator-coach-text">${getNavigatorGuidance(g, cw, milestones, progressPct)}</p>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  drawJourneyMap(progressPct);
+}
+
+// ─── Journey Map: Navigator Guidance (Phase 3) ──────────────────────
+function getNavigatorGuidance(g, cw, milestones, pct) {
+  if (pct >= 100) {
+    return `🎉 Destination reached! You have completed your goal. Outstanding work on mapping this journey successfully! Ready to set your next peak?`;
+  }
+  
+  if (g.goal_type === 'maintenance') {
+    if (Math.abs(cw - g.target_weight) > 2) {
+      return `⚠️ Navigator alert: Your current weight is outside your stability zone (${(g.target_weight - 2).toFixed(1)} - ${(g.target_weight + 2).toFixed(1)} kg). Log metrics regularly and adjust calories to get back on course.`;
+    }
+    return `🧭 Maintenance route is green! You are keeping your weight stable. Time elapsed: ${pct}% of target duration. Keep maintaining consistency.`;
+  }
+
+  const nextMilestone = milestones.find(m => !m.is_completed);
+  if (!nextMilestone) {
+    return `🧭 You are on the final stretch to your Destination. Keep going, you are almost there!`;
+  }
+
+  const diffToNext = Math.abs(cw - nextMilestone.target_value).toFixed(1);
+  return `🧭 Position check: You are on track at ${pct}% progress. Next milestone is **${nextMilestone.title}** (Target: ${nextMilestone.target_value} kg). You are just **${diffToNext} kg** away from unlocking it. Keep going!`;
+}
+
+// ─── Journey Map: SVG Dash Offset Animation (Phase 3) ───────────────
+function drawJourneyMap(progressPct) {
+  const path = document.getElementById('journey-progress-path');
+  const marker = document.getElementById('journey-current-marker');
+  if (!path || !marker) return;
+
+  const pathLength = path.getTotalLength();
+  path.style.strokeDasharray = pathLength;
+  path.style.strokeDashoffset = pathLength; 
+
+  path.getBoundingClientRect(); 
+
+  const fillOffset = pathLength * (1 - progressPct / 100);
+  path.style.strokeDashoffset = fillOffset;
+
+  const markerPos = getPositionOnPath(progressPct);
+  marker.setAttribute('transform', `translate(${markerPos.x}, ${markerPos.y})`);
+  marker.style.display = 'block';
+}
+
+// ─── Journey Map: Bezier Interpolation Math (Phase 3) ───────────────
+function getPositionOnPath(progressPct) {
+  const t = progressPct / 100;
+  
+  const segments = [
+    { start: {x: 180, y: 500}, ctrl: {x: 100, y: 445}, end: {x: 100, y: 390} }, 
+    { start: {x: 100, y: 390}, ctrl: {x: 180, y: 335}, end: {x: 260, y: 280} }, 
+    { start: {x: 260, y: 280}, ctrl: {x: 180, y: 225}, end: {x: 100, y: 170} }, 
+    { start: {x: 100, y: 170}, ctrl: {x: 180, y: 115}, end: {x: 180, y: 60}  }  
+  ];
+
+  let segmentIdx = Math.min(3, Math.floor(t * 4));
+  let s = (t - segmentIdx * 0.25) / 0.25; 
+  s = Math.max(0, Math.min(1, s)); 
+
+  const seg = segments[segmentIdx];
+  const u = 1 - s;
+  const x = u * u * seg.start.x + 2 * u * s * seg.ctrl.x + s * s * seg.end.x;
+  const y = u * u * seg.start.y + 2 * u * s * seg.ctrl.y + s * s * seg.end.y;
+
+  return { x, y };
+}
+
+// ─── Journey Map: Tooltip Box Handler (Phase 3) ─────────────────────
+function showJourneyTooltip(title, desc, isCompleted) {
+  const tooltip = document.getElementById('journey-tooltip');
+  if (!tooltip) return;
+
+  const titleEl = document.getElementById('tooltip-title');
+  const descEl = document.getElementById('tooltip-desc');
+  const statusEl = document.getElementById('tooltip-status');
+
+  titleEl.textContent = title;
+  descEl.textContent = desc;
+  statusEl.textContent = isCompleted ? '✓ Completed' : 'Locked';
+  statusEl.className = 'tooltip-status ' + (isCompleted ? 'completed' : 'locked');
+  statusEl.style.color = isCompleted ? 'var(--accent-green)' : 'rgba(255,255,255,0.45)';
+
+  tooltip.style.display = 'block';
+
+  if (window.tooltipTimer) clearTimeout(window.tooltipTimer);
+  window.tooltipTimer = setTimeout(() => {
+    tooltip.style.display = 'none';
+  }, 4000);
+}
+
  
