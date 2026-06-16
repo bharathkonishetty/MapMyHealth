@@ -113,6 +113,7 @@ function showDashboard(user) {
   loadCheckin();
   loadHealthScore();
   loadRecommendations();
+  loadCoach();
 }
  
 // ─── Save Profile Stats ───────────────────────────────────────────
@@ -130,6 +131,7 @@ async function saveProfile() {
     loadCheckin();
     loadHealthScore();
     loadRecommendations();
+    loadCoach();
   }
 }
  
@@ -174,6 +176,8 @@ function switchSection(sectionId, btn) {
     loadHealthScore();
   } else if (sectionId === 'recommendations') {
     loadRecommendations();
+  } else if (sectionId === 'coach') {
+    loadCoach();
   }
 }
  
@@ -567,6 +571,7 @@ async function submitGoal() {
     loadCheckin();
     loadHealthScore();
     loadRecommendations();
+    loadCoach();
     showToast(editId ? '✓ Goal updated.' : '✓ Goal created! Your journey has begun.');
   } else {
     msg.textContent = result.message;
@@ -592,6 +597,7 @@ async function updateGoalStatus(goalId, status) {
     loadCheckin();
     loadHealthScore();
     loadRecommendations();
+    loadCoach();
     showToast(status === 'completed' ? '🎉 Goal completed! Well done.' : 'Goal cancelled.');
   } else {
     showToast('Error: ' + result.message);
@@ -1527,6 +1533,7 @@ async function saveCheckin(e) {
       loadCheckin();
       loadHealthScore();
       loadRecommendations();
+      loadCoach();
     } else {
       if (msg) {
         msg.textContent = result.message || 'Validation error.';
@@ -1724,6 +1731,192 @@ function renderHealthScoreView(data) {
     }
   }, 100);
 }
+
+// ─── AI Coach: Load & Render Data (Phase 8) ───────────────────────────
+async function loadCoach() {
+  const container = document.getElementById('coach-main-area');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="loading-container" style="padding: 40px; text-align: center;">
+      <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: rgba(255,255,255,0.4);"></i>
+      <p style="margin-top: 10px; color: rgba(255,255,255,0.4); font-size: 13px;">Preparing your coaching summary...</p>
+    </div>
+  `;
+
+  try {
+    const response = await fetch('/api/coach').then(r => r.json());
+    if (response.success) {
+      renderCoachView(response);
+    } else {
+      container.innerHTML = `<p class="msg error" style="margin: 20px;">Error loading coach session: ${escapeHtml(response.message)}</p>`;
+    }
+  } catch (err) {
+    console.error(err);
+    container.innerHTML = `<p class="msg error" style="margin: 20px;">Failed to connect to coaching server.</p>`;
+  }
+}
+
+function renderCoachView(data) {
+  const container = document.getElementById('coach-main-area');
+  if (!container) return;
+
+  const { dailySummary, weeklySummary, answers } = data;
+
+  container.innerHTML = `
+    <div class="coach-grid">
+      <!-- Left Panel: Weekly Review & Focus Card -->
+      <div>
+        <!-- Daily Focus Card -->
+        <div class="coach-card">
+          <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-user-md" style="color: var(--primary-teal);"></i> Daily Coaching Summary
+          </h3>
+          <p style="margin: 0 0 14px 0; font-size: 13.5px; line-height: 1.5; color: rgba(255,255,255,0.85);">
+            ${escapeHtml(dailySummary.summary)}
+          </p>
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 12px 14px; border-radius: 12px;">
+            <span style="display: block; font-size: 10px; font-weight: 800; color: rgba(255,255,255,0.4); text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;">Today's Focus Area</span>
+            <span style="font-size: 13px; font-weight: 600; color: var(--warning-gold); line-height: 1.4;">${escapeHtml(dailySummary.focus)}</span>
+          </div>
+          <div class="coach-motivation-box">
+            "${escapeHtml(dailySummary.motivation)}"
+          </div>
+        </div>
+
+        <!-- Weekly Summary Card -->
+        <div class="coach-card">
+          <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #fff;">
+            Weekly Progress Summary
+          </h3>
+          
+          <!-- Wins -->
+          <h4 style="margin: 15px 0 8px 0; font-size: 11.5px; font-weight: 700; color: var(--accent-green); text-transform: uppercase; letter-spacing: 0.5px;">Weekly Wins</h4>
+          <div class="coach-summary-list">
+            ${weeklySummary.wins.map(w => `
+              <div class="coach-summary-item win">
+                <i class="fas fa-check-circle"></i>
+                <span>${escapeHtml(w)}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <!-- Risks -->
+          <h4 style="margin: 20px 0 8px 0; font-size: 11.5px; font-weight: 700; color: #ef4444; text-transform: uppercase; letter-spacing: 0.5px;">Weekly Risks</h4>
+          <div class="coach-summary-list">
+            ${weeklySummary.risks.map(r => `
+              <div class="coach-summary-item risk">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>${escapeHtml(r)}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <!-- Focus Areas -->
+          <h4 style="margin: 20px 0 8px 0; font-size: 11.5px; font-weight: 700; color: var(--warning-gold); text-transform: uppercase; letter-spacing: 0.5px;">Key Focus Targets</h4>
+          <div class="coach-summary-list">
+            ${weeklySummary.focusAreas.map(f => `
+              <div class="coach-summary-item focus">
+                <i class="fas fa-bullseye"></i>
+                <span>${escapeHtml(f)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel: Predefined Coach drawer -->
+      <div>
+        <div class="ask-coach-box">
+          <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #fff;">
+            Ask Coach Console
+          </h3>
+          <p style="margin: 0 0 20px 0; font-size: 12.5px; color: rgba(255,255,255,0.45); line-height: 1.4;">
+            Select one of the predefined topics below to receive detailed wellness analysis derived from your active logs.
+          </p>
+
+          <!-- Predefined Questions -->
+          <button class="coach-question-btn" onclick="showCoachAnswer('why_score', this)">
+            <span>Why did my Health Score change?</span>
+            <i class="fas fa-chevron-right" style="font-size: 11px; color: rgba(255,255,255,0.3);"></i>
+          </button>
+          
+          <button class="coach-question-btn" onclick="showCoachAnswer('on_track', this)">
+            <span>Am I on track to reach my goal?</span>
+            <i class="fas fa-chevron-right" style="font-size: 11px; color: rgba(255,255,255,0.3);"></i>
+          </button>
+
+          <button class="coach-question-btn" onclick="showCoachAnswer('weekly_focus', this)">
+            <span>What should I focus on this week?</span>
+            <i class="fas fa-chevron-right" style="font-size: 11px; color: rgba(255,255,255,0.3);"></i>
+          </button>
+
+          <button class="coach-question-btn" onclick="showCoachAnswer('why_recommendations', this)">
+            <span>Why am I receiving this recommendation?</span>
+            <i class="fas fa-chevron-right" style="font-size: 11px; color: rgba(255,255,255,0.3);"></i>
+          </button>
+
+          <button class="coach-question-btn" onclick="showCoachAnswer('improve_score', this)">
+            <span>How can I improve my score?</span>
+            <i class="fas fa-chevron-right" style="font-size: 11px; color: rgba(255,255,255,0.3);"></i>
+          </button>
+
+          <!-- Answer View Box -->
+          <div id="coach-answer-display" class="coach-answer-container" style="display: none;">
+            <h4 id="coach-answer-title"></h4>
+            <div id="coach-answer-text" style="white-space: pre-wrap;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Store answers in global window context for drawer toggle
+  window.coachAnswersData = answers;
+}
+
+function showCoachAnswer(key, btn) {
+  const display = document.getElementById('coach-answer-display');
+  const title = document.getElementById('coach-answer-title');
+  const text = document.getElementById('coach-answer-text');
+  if (!display || !title || !text || !window.coachAnswersData) return;
+
+  // Highlight selected button
+  document.querySelectorAll('.coach-question-btn').forEach(el => {
+    el.style.borderColor = 'rgba(255, 255, 255, 0.06)';
+    el.style.background = 'rgba(255, 255, 255, 0.02)';
+  });
+  if (btn) {
+    btn.style.borderColor = 'var(--primary-teal)';
+    btn.style.background = 'rgba(20, 184, 166, 0.05)';
+  }
+
+  // Set titles
+  const questionTitles = {
+    why_score: 'Why did my Health Score change?',
+    on_track: 'Am I on track to reach my goal?',
+    weekly_focus: 'What should I focus on this week?',
+    why_recommendations: 'Why am I receiving this recommendation?',
+    improve_score: 'How can I improve my score?'
+  };
+
+  title.textContent = questionTitles[key] || '';
+  
+  // Format markdown-like bold strings
+  let rawText = window.coachAnswersData[key] || 'No analysis available.';
+  let formatted = rawText.replace(/\*\*(.*?)\*\*/g, '<strong style="color:#fff;">$1</strong>');
+  
+  text.innerHTML = formatted;
+  
+  // Slide down or fade in
+  display.style.display = 'block';
+  display.style.opacity = '0';
+  display.style.transition = 'opacity 0.3s ease';
+  setTimeout(() => {
+    display.style.opacity = '1';
+  }, 50);
+}
+
 
 // ─── Recommendations: Load Data (Phase 7) ───────────────────────────
 async function loadRecommendations() {

@@ -1777,6 +1777,683 @@ app.get('/api/recommendations', async (req, res) => {
   }
 });
 
+// ─── AI Coach: Deterministic NLP-based Explanation Engine (Phase 8) ──────
+app.get('/api/coach', async (req, res) => {
+  if (!req.session.user)
+    return res.json({ success: false, message: 'Not logged in.' });
+
+  try {
+    const userId = req.session.user.id;
+    const todayStr = getLocalDateString(new Date());
+
+    // 1. Fetch active goal
+    const goalRes = await pool.query(
+      `SELECT * FROM goals WHERE user_id = $1 AND status = 'active' LIMIT 1`,
+      [userId]
+    );
+    const activeGoal = goalRes.rows.length > 0 ? goalRes.rows[0] : null;
+
+    // 2. Fetch today's check-in
+    const todayLogRes = await pool.query(
+      `SELECT * FROM progress_logs
+       WHERE user_id = $1 AND log_date = $2 LIMIT 1`,
+      [userId, todayStr]
+    );
+    const todayLog = todayLogRes.rows.length > 0 ? todayLogRes.rows[0] : null;
+
+    // 3. Fetch all check-in dates for streak calculations
+    const datesRes = await pool.query(
+      `SELECT DISTINCT log_date::text FROM progress_logs
+       WHERE user_id = $1
+       ORDER BY log_date::text ASC`,
+      [userId]
+    );
+    const logDates = datesRes.rows.map(row => row.log_date);
+    const { currentStreak } = calculateStreaks(logDates);
+
+    // 4. Fetch past 7 days logs for consistency calculations
+    const last7DaysRes = await pool.query(
+      `SELECT workout_completed FROM progress_logs
+       WHERE user_id = $1 AND log_date >= CURRENT_DATE - INTERVAL '6 days'
+       AND workout_completed = TRUE`,
+      [userId]
+    );
+    const completedWorkoutsThisWeek = last7DaysRes.rows.length;
+
+    // 5. Fetch 30-day energy levels average
+    const energyAvgRes = await pool.query(
+      `SELECT AVG(energy_level) as avg_energy FROM progress_logs
+       WHERE user_id = $1 AND log_date >= CURRENT_DATE - INTERVAL '29 days'
+       AND energy_level IS NOT NULL`,
+      [userId]
+    );
+    const avgEnergy = energyAvgRes.rows.length > 0 && energyAvgRes.rows[0].avg_energy !== null
+      ? parseFloat(energyAvgRes.rows[0].avg_energy)
+      : 3.0;
+
+    // 6. Fetch 30-day logs
+    const logsRes = await pool.query(
+      `SELECT log_date::text, weight FROM progress_logs
+       WHERE user_id = $1 AND log_date >= CURRENT_DATE - INTERVAL '29 days'
+       AND weight IS NOT NULL
+       ORDER BY log_date ASC`,
+      [userId]
+    );
+    const weightHistory = logsRes.rows.map(row => ({
+      log_date: row.log_date,
+      weight: parseFloat(row.weight)
+    }));
+
+    // 7. Fetch latest weight
+    const latestWeightRes = await pool.query(
+      `SELECT weight FROM progress_logs
+       WHERE user_id = $1 AND weight IS NOT NULL
+       ORDER BY log_date DESC, created_at DESC LIMIT 1`,
+      [userId]
+    );
+    const sw = activeGoal ? parseFloat(activeGoal.start_weight) : null;
+    const tw = activeGoal ? parseFloat(activeGoal.target_weight) : null;
+    const currentWeight = latestWeightRes.rows.length > 0
+      ? parseFloat(latestWeightRes.rows[0].weight)
+      : (sw || null);
+
+    // Health Score Components
+    let goalScore = 60;
+    let daysDifference = 0;
+    let estDaysRemaining = 0;
+    let weeklyRate = 0;
+    let isMovingTowardsGoal = false;
+    let rateTowardsGoal = 0;
+
+    if (activeGoal) {
+      if (activeGoal.goal_type === 'maintenance') {
+        const deviation = Math.abs(currentWeight - tw);
+        if (deviation <= 2) goalScore = 100;
+        else goalScore = Math.max(0, Math.round(100 - (deviation - 2) * 10));
+      } else {
+        const targetDate = new Date(activeGoal.target_date);
+        const today = new Date(); today.setHours(0,0,0,0);
+        const daysRemaining = Math.max(0, Math.round((targetDate - today) / (1000 * 60 * 60 * 24)));
+        const weightLogsCount = weightHistory.length;
+        
+        if (weightLogsCount >= 2) {
+          const earliest = weightHistory[0];
+          const latest = weightHistory[weightLogsCount - 1];
+          const dateDiffDays = Math.round((new Date(latest.log_date) - new Date(earliest.log_date)) / (1000 * 60 * 60 * 24));
+          if (dateDiffDays >= 3) {
+            const weightDiff = latest.weight - earliest.weight;
+            weeklyRate = Math.round((weightDiff / dateDiffDays * 7) * 100) / 100;
+            if (activeGoal.goal_type === 'weight_loss' && weeklyRate < 0) {
+              isMovingTowardsGoal = true;
+              rateTowardsGoal = -weeklyRate;
+            } else if (activeGoal.goal_type === 'muscle_gain' && weeklyRate > 0) {
+              isMovingTowardsGoal = true;
+              rateTowardsGoal = weeklyRate;
+            }
+          }
+        }
+        if (isMovingTowardsGoal && rateTowardsGoal > 0) {
+          const weightRemaining = Math.abs(currentWeight - tw);
+          estDaysRemaining = Math.ceil(weightRemaining / (rateTowardsGoal / 7));
+          daysDifference = daysRemaining - estDaysRemaining;
+          if (daysDifference >= -3) goalScore = 100;
+          else goalScore = Math.max(20, Math.round(100 - Math.abs(daysDifference) * 2));
+        } else {
+          goalScore = 60;
+        }
+      }
+    } else {
+      goalScore = 40;
+    }
+
+    const stepsLogged = todayLog ? parseInt(todayLog.steps_count || 0, 10) : 0;
+    const durationLogged = todayLog ? parseInt(todayLog.workout_duration_mins || 0, 10) : 0;
+    const stepsPart = Math.min(100, (stepsLogged / 10000) * 100);
+    const durationPart = Math.min(100, (durationLogged / 30) * 100);
+    const activityScore = Math.round(0.60 * stepsPart + 0.40 * durationPart);
+
+    const consistencyScore = Math.round(Math.min(100, (completedWorkoutsThisWeek / 3) * 100));
+
+    const waterMl = todayLog ? parseInt(todayLog.water_intake_ml || 0, 10) : 0;
+    const waterL = parseFloat((waterMl / 1000).toFixed(2));
+    const hydrationScore = Math.round(Math.min(100, (waterL / 3.0) * 100));
+
+    const energyVal = todayLog ? todayLog.energy_level : null;
+    const finalEnergy = energyVal !== null ? energyVal : avgEnergy;
+    const energyScore = Math.round((finalEnergy / 5) * 100);
+
+    const streakScore = Math.round(Math.min(100, (currentStreak / 7) * 100));
+
+    const totalScore = Math.round(
+      0.25 * goalScore +
+      0.20 * activityScore +
+      0.20 * consistencyScore +
+      0.15 * hydrationScore +
+      0.05 * energyScore +
+      0.15 * streakScore
+    );
+
+    let rating = 'Needs Attention';
+    if (totalScore >= 90) rating = 'Elite';
+    else if (totalScore >= 80) rating = 'Excellent';
+    else if (totalScore >= 70) rating = 'Good';
+    else if (totalScore >= 60) rating = 'Fair';
+
+    // RECOMMENDATIONS GENERATION
+    const recommendations = [];
+    const isNewUser = (logDates.length === 0 && !activeGoal);
+
+    if (isNewUser) {
+      recommendations.push({
+        category: 'goal_progress',
+        priority: 'high',
+        title: 'Onboarding: Create Your Health Goal',
+        description: 'Welcome to MapMyHealth! Set a weight loss, muscle gain, or maintenance target weight to structure your journey.',
+        expectedBenefit: 'Unlocks Goal Progress tracking, forecast projections, and activates your Health Score.'
+      });
+      recommendations.push({
+        category: 'consistency',
+        priority: 'high',
+        title: 'Onboarding: Complete Your First Check-In',
+        description: 'Establishing a daily logging habit is key. Submit today\'s check-in to start your streak and seed your progress charts.',
+        expectedBenefit: 'Initiates your check-in streak and feeds metrics to your forecasting engine.'
+      });
+      recommendations.push({
+        category: 'activity',
+        priority: 'high',
+        title: 'Onboarding: Establish a Daily Step Habit',
+        description: 'Aim for a target of 10,000 steps daily. Track your progress by logging daily movement in check-ins.',
+        expectedBenefit: 'Sets a baseline cardio index and increases your activity score component.'
+      });
+      recommendations.push({
+        category: 'hydration',
+        priority: 'medium',
+        title: 'Onboarding: Aim for 3.0 L Daily Water',
+        description: 'Begin tracking hydration by logging water intake. Try to hit a baseline target of 3.0 Liters per day.',
+        expectedBenefit: 'Maintains optimal blood volume, aids digestion, and keeps cellular performance high.'
+      });
+      recommendations.push({
+        category: 'recovery',
+        priority: 'medium',
+        title: 'Onboarding: Track Sleep & Vitality',
+        description: 'Monitor your subjective energy levels and match physical efforts with 7-8 hours of quality sleep.',
+        expectedBenefit: 'Stabilizes central nervous system fatigue and improves daily energy levels.'
+      });
+    } else {
+      // 1. Goal Progress
+      if (!activeGoal) {
+        recommendations.push({
+          category: 'goal_progress',
+          priority: 'high',
+          title: 'Set an Active Health Goal',
+          description: 'You do not have an active goal. Setting a target weight or maintenance goal provides a clear endpoint for your health journey.',
+          expectedBenefit: 'Unlocks Goal Progress score tracking and adds structure to your health score roadmap.'
+        });
+      } else if (activeGoal.goal_type === 'maintenance') {
+        const deviation = Math.abs(currentWeight - tw);
+        if (deviation > 2) {
+          recommendations.push({
+            category: 'goal_progress',
+            priority: deviation > 5 ? 'high' : 'medium',
+            title: 'Realign to Weight Maintenance Target',
+            description: `Your weight (${currentWeight.toFixed(1)} kg) deviates from your maintenance target of ${tw} kg by ${deviation.toFixed(1)} kg (zone is +/- 2 kg).`,
+            expectedBenefit: 'Improves skeletal stability, controls body fat distribution, and restores your Goal Progress score component.'
+          });
+        } else {
+          recommendations.push({
+            category: 'goal_progress',
+            priority: 'low',
+            title: 'Maintain Current Weight Trajectory',
+            description: `Your current weight (${currentWeight.toFixed(1)} kg) is within your stability target zone (+/- 2 kg of ${tw} kg).`,
+            expectedBenefit: 'Maintains optimal energy balance and skeletal stability.'
+          });
+        }
+      } else {
+        const startDate = new Date(activeGoal.start_date);
+        const targetDate = new Date(activeGoal.target_date);
+        const today = new Date(); today.setHours(0,0,0,0);
+        const daysRemaining = Math.max(0, Math.round((targetDate - today) / (1000 * 60 * 60 * 24)));
+        const weightLogsCount = weightHistory.length;
+        let weeklyRate = 0;
+        let isMovingTowardsGoal = false;
+        let rateTowardsGoal = 0;
+        
+        if (weightLogsCount >= 2) {
+          const earliest = weightHistory[0];
+          const latest = weightHistory[weightLogsCount - 1];
+          const dateDiffDays = Math.round((new Date(latest.log_date) - new Date(earliest.log_date)) / (1000 * 60 * 60 * 24));
+          if (dateDiffDays >= 3) {
+            const weightDiff = latest.weight - earliest.weight;
+            weeklyRate = Math.round((weightDiff / dateDiffDays * 7) * 100) / 100;
+            if (activeGoal.goal_type === 'weight_loss' && weeklyRate < 0) {
+              isMovingTowardsGoal = true;
+              rateTowardsGoal = -weeklyRate;
+            } else if (activeGoal.goal_type === 'muscle_gain' && weeklyRate > 0) {
+              isMovingTowardsGoal = true;
+              rateTowardsGoal = weeklyRate;
+            }
+          }
+        }
+
+        if (isMovingTowardsGoal && rateTowardsGoal > 0) {
+          const weightRemaining = Math.abs(currentWeight - tw);
+          const estDaysRemaining = Math.ceil(weightRemaining / (rateTowardsGoal / 7));
+          const daysDifference = daysRemaining - estDaysRemaining;
+          
+          if (daysDifference >= -3) {
+            if (daysDifference > 15 && rateTowardsGoal > 1.5 && activeGoal.goal_type === 'weight_loss') {
+              recommendations.push({
+                category: 'goal_progress',
+                priority: 'low',
+                title: 'Moderate Weight Progress Pace',
+                description: `You are ${daysDifference} days ahead of schedule with a rate of ${rateTowardsGoal.toFixed(2)} kg/week. Slowing down ensures changes are sustainable.`,
+                expectedBenefit: 'Preserves lean muscle mass and avoids physical fatigue or metabolic crash.'
+              });
+            } else {
+              recommendations.push({
+                category: 'goal_progress',
+                priority: 'low',
+                title: 'Maintain Current Weight Trajectory',
+                description: `Your weight velocity (${rateTowardsGoal.toFixed(2)} kg/week) is perfectly on track with your target goal schedule.`,
+                expectedBenefit: 'Ensures you reach your goal weight safely and predictably.'
+              });
+            }
+          } else {
+            const behindDays = Math.abs(daysDifference);
+            recommendations.push({
+              category: 'goal_progress',
+              priority: behindDays > 10 ? 'high' : 'medium',
+              title: activeGoal.goal_type === 'weight_loss' ? 'Increase Weight Velocity Pace' : 'Increase Muscle Weight Pace',
+              description: `Your weight velocity is currently behind schedule by ${Math.round(behindDays)} days. Your current rate is ${weeklyRate > 0 ? '+' : ''}${weeklyRate} kg/week.`,
+              expectedBenefit: `Puts you back on track to hit your goal of ${tw} kg by your target date of ${getLocalDateString(targetDate)}.`
+            });
+          }
+        } else {
+          recommendations.push({
+            category: 'goal_progress',
+            priority: 'medium',
+            title: activeGoal.goal_type === 'weight_loss' ? 'Accelerate Weight Loss Progress' : 'Accelerate Muscle Gain Progress',
+            description: weightLogsCount < 2 
+              ? 'Insufficient logs to determine schedule velocity. Log weight at least twice over a 3-day window.' 
+              : `Your weight trend (${weeklyRate > 0 ? '+' : ''}${weeklyRate} kg/week) is stable or moving away from your goal parameters.`,
+            expectedBenefit: 'Re-aligns metabolic output to resume weight trajectory towards goal.'
+          });
+        }
+      }
+
+      // 2. Activity
+      if (stepsLogged < 2000) {
+        const stepsRem = 10000 - stepsLogged;
+        recommendations.push({
+          category: 'activity',
+          priority: 'high',
+          title: 'Activate Daily Movement',
+          description: stepsLogged === 0 
+            ? 'No steps logged today. Start walking to build cardiovascular momentum.'
+            : `You have only logged ${stepsLogged.toLocaleString()} steps today. Walk ${stepsRem.toLocaleString()} more steps to hit your daily goal.`,
+          expectedBenefit: 'Triggers active calorie burn, boosts circulation, and increases activity score component.'
+        });
+      } else if (stepsLogged < 4000) {
+        const stepsRem = 10000 - stepsLogged;
+        recommendations.push({
+          category: 'activity',
+          priority: 'medium',
+          title: 'Increase Daily Step Count',
+          description: `You have logged ${stepsLogged.toLocaleString()} steps today. Walk ${stepsRem.toLocaleString()} more steps to hit your 10,000 step goal.`,
+          expectedBenefit: 'Improves aerobic fitness, enhances active recovery, and increases activity score component.'
+        });
+      } else if (stepsLogged < 10000) {
+        const stepsRem = 10000 - stepsLogged;
+        recommendations.push({
+          category: 'activity',
+          priority: 'low',
+          title: 'Optimize Daily Step Target',
+          description: `You are at ${stepsLogged.toLocaleString()} steps today. Walk ${stepsRem.toLocaleString()} more steps to reach full optimization.`,
+          expectedBenefit: 'Maximizes step-points and locks in consistent daily movement patterns.'
+        });
+      } else {
+        recommendations.push({
+          category: 'activity',
+          priority: 'low',
+          title: 'Maintain Active Movement Habit',
+          description: 'Excellent! You met or exceeded your 10,000 steps daily target today.',
+          expectedBenefit: 'Supports cardiorespiratory health and preserves your 100% daily activity score.'
+        });
+      }
+
+      // 3. Hydration
+      if (waterL < 1.5) {
+        recommendations.push({
+          category: 'hydration',
+          priority: 'high',
+          title: 'Increase Hydration Immediately',
+          description: `Water intake is critically low at ${waterL} L. Drink 6-8 glasses of water to support cellular hydration.`,
+          expectedBenefit: 'Boosts energy, improves cognitive clarity, and increases Health Score by up to 7.5 points.'
+        });
+      } else if (waterL < 3.0) {
+        const waterRem = parseFloat((3.0 - waterL).toFixed(1));
+        recommendations.push({
+          category: 'hydration',
+          priority: 'medium',
+          title: 'Increase Daily Water Intake',
+          description: `You have consumed ${waterL} L of water today. Drink approximately ${waterRem} L more to reach your daily goal.`,
+          expectedBenefit: 'Supports metabolic detoxification and helps secure maximum hydration score.'
+        });
+      } else {
+        recommendations.push({
+          category: 'hydration',
+          priority: 'low',
+          title: 'Maintain Hydration Habits',
+          description: 'Great job! You met your 3.0 L daily hydration goal.',
+          expectedBenefit: 'Maintains cellular volume, aids digestion, and preserves hydration score at 100%.'
+        });
+      }
+
+      // 4. Recovery (Combining Energy & Workouts)
+      const energyLabels = { 1: 'Exhausted', 2: 'Tired', 3: 'Normal', 4: 'Energetic', 5: 'Peak' };
+      if ((energyVal !== null && energyVal <= 2) || (energyVal === null && avgEnergy <= 2.5)) {
+        if (completedWorkoutsThisWeek >= 4) {
+          recommendations.push({
+            category: 'recovery',
+            priority: 'high',
+            title: 'Immediate Rest & Active Recovery',
+            description: `Your energy is rated as low (${finalEnergy.toFixed(1)}/5) and you have trained intensely with ${completedWorkoutsThisWeek} workouts this week. Your nervous system needs rest.`,
+            expectedBenefit: 'Prevents acute muscle strain, lowers systemic fatigue, and protects long-term metabolic health.'
+          });
+        } else {
+          recommendations.push({
+            category: 'recovery',
+            priority: 'high',
+            title: 'Prioritize Quality Sleep & Rest',
+            description: `Your energy level is rated as ${energyLabels[Math.round(finalEnergy)]} (${finalEnergy.toFixed(1)}/5). Ensure you get 7-8 hours of sleep tonight and avoid intense exertion.`,
+            expectedBenefit: 'Lowers circulating cortisol, initiates hormone recovery, and restores basic daily vitality.'
+          });
+        }
+      } else if (completedWorkoutsThisWeek >= 5) {
+        recommendations.push({
+          category: 'recovery',
+          priority: 'medium',
+          title: 'Schedule a Planned Rest Day',
+          description: `You have completed ${completedWorkoutsThisWeek} workouts in the last 7 days. Even with good energy, continuous training without rest increases injury risk.`,
+          expectedBenefit: 'Allows supercompensation, repairs microtears, and maintains metabolic performance.'
+        });
+      } else if (finalEnergy === 3) {
+        recommendations.push({
+          category: 'recovery',
+          priority: 'low',
+          title: 'Active Recovery & Mobility',
+          description: 'Energy is at a stable baseline (3/5). Support muscle regeneration with light mobility drills, hydration, and stretching.',
+          expectedBenefit: 'Increases blood flow to recovering tissues and maintains joint flexibility.'
+        });
+      } else {
+        recommendations.push({
+          category: 'recovery',
+          priority: 'low',
+          title: 'Optimal Recovery Status',
+          description: 'Excellent balance of energy and training consistency. Your recovery capacity matches your active workload.',
+          expectedBenefit: 'Supports consistent training progression without risk of overtraining.'
+        });
+      }
+
+      // 5. Consistency
+      if (!todayLog) {
+        recommendations.push({
+          category: 'consistency',
+          priority: currentStreak > 0 ? 'high' : 'medium',
+          title: currentStreak > 0 ? 'Protect Check-In Streak' : 'Establish Daily Logging Habits',
+          description: 'You haven\'t logged your metrics today. Fill out your check-in card to keep your dashboard records active.',
+          expectedBenefit: `Protects your check-in streak of ${currentStreak} days and feeds data to your forecasting engine.`
+        });
+      } else if (completedWorkoutsThisWeek < 3) {
+        const workoutsRem = 3 - completedWorkoutsThisWeek;
+        recommendations.push({
+          category: 'consistency',
+          priority: 'medium',
+          title: 'Build Workout Consistency',
+          description: `Completed ${completedWorkoutsThisWeek} workouts this week. Try to complete ${workoutsRem} more sessions to hit your target of 3.`,
+          expectedBenefit: 'Improves general physical fitness and raises consistency score component.'
+        });
+      } else if (currentStreak >= 3 && currentStreak < 7) {
+        const streakRem = 7 - currentStreak;
+        recommendations.push({
+          category: 'consistency',
+          priority: 'low',
+          title: 'Secure 7-Day Streak Bonus',
+          description: `You have logged ${currentStreak} consecutive days. Log ${streakRem} more days to secure your 7-day bonus.`,
+          expectedBenefit: 'Builds lasting habit loops and locks in check-in streak score points.'
+        });
+      } else {
+        recommendations.push({
+          category: 'consistency',
+          priority: 'low',
+          title: 'Maintain Logging Habits',
+          description: `Fantastic! You are on a ${currentStreak}-day check-in streak.`,
+          expectedBenefit: 'Maintains maximum check-in streak score and ensures uninterrupted weight trend data.'
+        });
+      }
+    }
+
+    const priorityWeights = { high: 3, medium: 2, low: 1 };
+    recommendations.sort((a, b) => priorityWeights[b.priority] - priorityWeights[a.priority]);
+    const topRec = recommendations.length > 0 ? recommendations[0] : null;
+
+    // ─────────────────────────────────────────────────────────────────
+    // DYNAMIC COACH DASHBOARD SUMMARIES
+    // ─────────────────────────────────────────────────────────────────
+    const categoryLabels = {
+      goal_progress: 'Goal Progress',
+      activity: 'Activity',
+      hydration: 'Hydration',
+      recovery: 'Recovery',
+      consistency: 'Consistency'
+    };
+
+    let coachSummary = 'Your journey metrics look stable. Review your recommendations to begin optimizing your lifestyle scores.';
+    let coachFocus = topRec ? `${topRec.title}: ${topRec.description}` : 'Maintain current habits.';
+    let coachMotivation = 'Consistency is the cornerstone of sustainable health journey progression!';
+
+    if (isNewUser) {
+      coachSummary = 'Welcome to MapMyHealth! Your primary objective today is onboarding. Follow the coaching checklist to start tracking details.';
+      coachFocus = 'Set your active health goal and log today\'s initial check-in statistics.';
+      coachMotivation = 'Your health route starts here. Every tracking milestone makes progress clearer!';
+    } else {
+      if (totalScore >= 80) {
+        coachSummary = `Outstanding work! You have achieved an ${rating} health status with a score of ${totalScore}. Your activity and recovery balance is highly optimized.`;
+        coachMotivation = 'Keep pushing your limits. You are currently in the peak tier of wellness!';
+      } else if (totalScore >= 70) {
+        coachSummary = `Great progress! Your score is ${totalScore} (Good). You have a solid habit base, but a few minor tweaks will push you into the Excellent tier.`;
+        coachMotivation = 'Focus on consistency today. Smaller actions compound into massive wins!';
+      } else if (totalScore >= 60) {
+        coachSummary = `Your score is ${totalScore} (Fair). Your habit structure is starting to align, but there are multiple opportunities to capture immediate score points.`;
+        coachMotivation = 'Let\'s raise that score. Tackle the high-priority targets first!';
+      } else {
+        coachSummary = `Your current score is ${totalScore} (Needs Attention). Regular daily logging and setting structured goals are critical to get back on track.`;
+        coachMotivation = 'Every journey begins with a single step. Complete today\'s check-in to jumpstart your stats!';
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // WEEKLY WINS / RISKS / FOCUS AREAS
+    // ─────────────────────────────────────────────────────────────────
+    const wins = [];
+    const risks = [];
+    const focusAreas = [];
+
+    if (isNewUser) {
+      wins.push('Created MapMyHealth account.');
+      risks.push('No active weight or fitness goal has been configured.');
+      risks.push('Initial check-in data is pending.');
+      focusAreas.push('Create a weight loss, muscle gain, or maintenance goal.');
+      focusAreas.push('Complete today\'s metrics check-in (Weight, Steps, Water).');
+    } else {
+      // Wins
+      if (stepsLogged >= 10000) wins.push(`Met step target today (${stepsLogged.toLocaleString()} steps walked).`);
+      if (waterL >= 3.0) wins.push(`Met hydration goal today (${waterL} L water logged).`);
+      if (durationLogged >= 30) wins.push(`Completed daily active exercise target (${durationLogged} mins logged).`);
+      if (currentStreak >= 3) wins.push(`Maintained a solid check-in streak of ${currentStreak} consecutive days.`);
+      if (completedWorkoutsThisWeek >= 3) wins.push(`Completed consistency targets with ${completedWorkoutsThisWeek} weekly workouts.`);
+      if (wins.length === 0) wins.push('Completed today\'s progress log.');
+
+      // Risks
+      if (!activeGoal) risks.push('No active health goal configured.');
+      if (activeGoal && activeGoal.goal_type !== 'maintenance' && daysDifference < -3) {
+        risks.push(`Behind target weight schedule by ${Math.abs(daysDifference)} days.`);
+      }
+      if (stepsLogged < 2000) risks.push(`Daily steps count is critically low (${stepsLogged.toLocaleString()} steps).`);
+      if (waterL < 1.5) risks.push(`Daily water intake is critically low (${waterL} L).`);
+      if (completedWorkoutsThisWeek < 2) risks.push(`Weekly training frequency is lagging (${completedWorkoutsThisWeek}/3 target workouts completed).`);
+      const energyLabels = { 1: 'Exhausted', 2: 'Tired', 3: 'Normal', 4: 'Energetic', 5: 'Peak' };
+      if (energyVal !== null && energyVal <= 2) risks.push(`Fatigue detected: energy rated low today (${energyVal}/5 - ${energyLabels[energyVal]}).`);
+      if (risks.length === 0) risks.push('No major health risks detected. Your metrics are well balanced!');
+
+      // Focus Areas
+      recommendations.slice(0, 3).forEach(rec => {
+        focusAreas.push(`${rec.title} (${categoryLabels[rec.category] || rec.category})`);
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // DETERMINISTIC COACH ANSWERS (PREDEFINED QUESTIONS)
+    // ─────────────────────────────────────────────────────────────────
+    const answers = {
+      why_score: '',
+      on_track: '',
+      weekly_focus: '',
+      why_recommendations: '',
+      improve_score: ''
+    };
+
+    // 1. Why did my Health Score change?
+    const scoreRating = rating;
+    const goalContrib = (0.25 * goalScore).toFixed(1);
+    const actContrib = (0.20 * activityScore).toFixed(1);
+    const constContrib = (0.20 * consistencyScore).toFixed(1);
+    const hydContrib = (0.15 * hydrationScore).toFixed(1);
+    const energyContrib = (0.05 * energyScore).toFixed(1);
+    const streakContrib = (0.15 * streakScore).toFixed(1);
+
+    answers.why_score = `Your Health Score is currently at **${totalScore}** (rated **${scoreRating}**). The score is constructed dynamically based on 6 weighted health metrics:
+
+*   **Goal Progress (25% weight)**: Contributing **${goalContrib}** points (Metric: ${activeGoal ? goalScore : 40}/100).
+*   **Daily Activity (20% weight)**: Contributing **${actContrib}** points (Metric: ${activityScore}/100 based on ${stepsLogged.toLocaleString()} steps and ${durationLogged} mins exercise today).
+*   **Workout Consistency (20% weight)**: Contributing **${constContrib}** points (Metric: ${consistencyScore}/100 based on ${completedWorkoutsThisWeek} workouts in last 7 days).
+*   **Hydration (15% weight)**: Contributing **${hydContrib}** points (Metric: ${hydrationScore}/100 based on ${waterL} L water consumed today).
+*   **Energy Levels (5% weight)**: Contributing **${energyContrib}** points (Metric: ${energyScore}/100 based on an energy rating of ${finalEnergy.toFixed(1)}/5).
+*   **Check-In Streak (15% weight)**: Contributing **${streakContrib}** points (Metric: ${streakScore}/100 based on a ${currentStreak}-day active logging streak).
+
+Focus on addressing daily hydration and step deficits to trigger immediate positive score shifts.`;
+
+    // 2. Am I on track to reach my goal?
+    if (isNewUser) {
+      answers.on_track = 'You do not have an active goal or logging history. Please set an active fitness goal and complete today\'s check-in to enable tracking calculations.';
+    } else if (!activeGoal) {
+      answers.on_track = 'No active goal is set. Setting an active fitness target (weight loss, muscle gain, or maintenance) is required to calculate schedule tracking.';
+    } else if (activeGoal.goal_type === 'maintenance') {
+      const deviation = Math.abs(currentWeight - tw);
+      answers.on_track = `You are on a **Maintenance Goal** targeting **${tw} kg**. Your current weight is **${currentWeight.toFixed(1)} kg**, which deviates by **${deviation.toFixed(1)} kg**. You are currently **${deviation <= 2 ? 'On Track' : 'Behind Target'}** (your stability target zone is +/- 2 kg).`;
+    } else {
+      const targetDate = new Date(activeGoal.target_date);
+      if (isMovingTowardsGoal && rateTowardsGoal > 0) {
+        answers.on_track = `Yes! You are on track. Your current weight is **${currentWeight.toFixed(1)} kg** against a target of **${tw} kg**. You are projected to hit your goal **${daysDifference >= 0 ? daysDifference + ' days ahead of' : Math.abs(daysDifference) + ' days behind'}** your target date of **${getLocalDateString(targetDate)}**. Your average weekly weight change rate is **${weeklyRate.toFixed(2)} kg/week**.`;
+      } else {
+        answers.on_track = `Your weight trajectory is currently lagging. Your current weight is **${currentWeight.toFixed(1)} kg** (target: **${tw} kg**). Your weekly rate of weight change is **${weeklyRate > 0 ? '+' : ''}${weeklyRate} kg/week**, which is stable or moving away from your goal parameters. Log weight consistently over the next few days to allow the forecasting model to recalculate.`;
+      }
+    }
+
+    // 3. What should I focus on this week?
+    if (isNewUser) {
+      answers.weekly_focus = 'Your main focus this week is establishing consistent daily habit patterns:\n\n1. Set an active goal parameters (Weight Loss / Muscle Gain / Maintenance).\n2. Complete at least 3 check-ins to initialize streak tracking.\n3. Establish baseline step movements of 6,000+ steps daily.';
+    } else {
+      const top3 = recommendations.slice(0, 3);
+      answers.weekly_focus = `Based on your telemetry, here are your top 3 actionable tasks to focus on this week:
+
+${top3.map((rec, i) => `${i + 1}.  **${rec.title}** (${categoryLabels[rec.category] || rec.category})
+    *   *Action*: ${rec.description}
+    *   *Benefit*: ${rec.expectedBenefit}`).join('\n\n')}`;
+    }
+
+    // 4. Why am I receiving this recommendation?
+    if (isNewUser) {
+      answers.why_recommendations = 'You are receiving onboarding recommendations because your account is brand new. Once you set a goal and submit check-ins, recommendations will update dynamically based on your physical telemetry.';
+    } else if (topRec) {
+      let triggerReason = 'your wellness parameters are under evaluation';
+      const energyLabels = { 1: 'Exhausted', 2: 'Tired', 3: 'Normal', 4: 'Energetic', 5: 'Peak' };
+      if (topRec.category === 'hydration') triggerReason = `today's water intake is at ${waterL} L (target: 3.0 L)`;
+      else if (topRec.category === 'activity') triggerReason = `today's step count is at ${stepsLogged.toLocaleString()} (target: 10,000)`;
+      else if (topRec.category === 'recovery') triggerReason = `your energy is rated as ${energyLabels[Math.round(finalEnergy)]} (${finalEnergy.toFixed(1)}/5) and weekly training volume is at ${completedWorkoutsThisWeek} sessions`;
+      else if (topRec.category === 'consistency') triggerReason = `your daily logging check-in is pending for today (current streak is at ${currentStreak} days)`;
+      else if (topRec.category === 'goal_progress') triggerReason = `your weight velocity is currently behind your goal target timeline`;
+
+      answers.why_recommendations = `You are receiving the primary recommendation **"${topRec.title}"** because **${triggerReason}**. The system dynamically flags the category with the largest score deficit to guide your health journey route safely.`;
+    } else {
+      answers.why_recommendations = 'No active recommendations are triggered because all your daily targets, consistency streaks, and weight velocities are fully optimized!';
+    }
+
+    // 5. How can I improve my score?
+    if (isNewUser) {
+      answers.improve_score = 'To immediately improve your Health Score: \n\n1. Create an active goal: **+15 points** (Goal Progress contribution)\n2. Complete today\'s check-in: **+15 points** (Streak and Energy contributions)';
+    } else {
+      const improveTips = [];
+      if (stepsPart < 100) {
+        const stepsRem = 10000 - stepsLogged;
+        const stepPts = Math.round((0.20 * 0.60 * (stepsRem / 10000) * 100) * 10) / 10;
+        if (stepPts > 0) improveTips.push(`*   **Walk ${stepsRem.toLocaleString()} more steps today**: Adds up to **+${stepPts}** points to your Health Score.`);
+      }
+      if (durationPart < 100) {
+        const durRem = 30 - durationLogged;
+        const durPts = Math.round((0.20 * 0.40 * (durRem / 30) * 100) * 10) / 10;
+        if (durPts > 0) improveTips.push(`*   **Exercise for ${durRem} more minutes today**: Adds up to **+${durPts}** points to your Health Score.`);
+      }
+      if (waterL < 3.0) {
+        const waterRem = parseFloat((3.0 - waterL).toFixed(1));
+        const waterPts = Math.round((0.15 * (waterRem / 3.0) * 100) * 10) / 10;
+        if (waterPts > 0) improveTips.push(`*   **Drink ${waterRem} L more water today**: Adds up to **+${waterPts}** points to your Health Score.`);
+      }
+      if (completedWorkoutsThisWeek < 3) {
+        const consistencyPts = Math.round((0.20 * (1 / 3) * 100) * 10) / 10;
+        improveTips.push(`*   **Complete your next workout session**: Adds **+${consistencyPts}** points to your Consistency component.`);
+      }
+      if (currentStreak < 7) {
+        const streakPts = Math.round((0.15 * (1 / 7) * 100) * 10) / 10;
+        improveTips.push(`*   **Log check-in tomorrow**: Extends your streak and adds **+${streakPts}** points to your Streak component.`);
+      }
+      if (!activeGoal) {
+        improveTips.push('*   **Set an active goal**: Restores your Goal Progress component and adds **+10.0** points.');
+      }
+
+      if (improveTips.length > 0) {
+        answers.improve_score = `Here are the exact points-earning actions you can perform today to raise your Health Score:
+
+${improveTips.join('\n\n')}
+
+Focus on completing these actions to secure immediate score improvements.`;
+      } else {
+        answers.improve_score = 'Excellent! All your daily tracking targets and consistency streaks are fully optimized today. Keep maintaining this routine to preserve your high score!';
+      }
+    }
+
+    res.json({
+      success: true,
+      dailySummary: {
+        summary: coachSummary,
+        focus: coachFocus,
+        motivation: coachMotivation
+      },
+      weeklySummary: {
+        wins,
+        risks,
+        focusAreas
+      },
+      answers
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.json({ success: false, message: 'Server error. Please try again.' });
+  }
+});
+
+
 
 // ─── Serve SPA ────────────────────────────────────────────────────
 app.get('*', (req, res) => {
