@@ -81,6 +81,7 @@
     <div class="nav-tabs">
       <button class="nav-tab active" onclick="switchSection('workouts', this)">WORKOUTS</button>
       <button class="nav-tab"        onclick="switchSection('healthscore', this)">HEALTH SCORE</button>
+      <button class="nav-tab"        onclick="switchSection('recommendations', this)">RECOMMENDATIONS</button>
       <button class="nav-tab"        onclick="switchSection('goals', this)">GOALS</button>
       <button class="nav-tab"        onclick="switchSection('journey', this)">JOURNEY MAP</button>
       <button class="nav-tab"        onclick="switchSection('analytics', this)">ANALYTICS</button>
@@ -545,6 +546,20 @@
         </div>
       </div>
     </div><!-- /healthscore -->
+
+    <!-- ─── RECOMMENDATIONS SECTION ───────────────────────────────── -->
+    <div id="recommendations" class="section-content">
+      <div class="journey-section-inner">
+        <div class="journey-header">
+          <h2>Recommendations</h2>
+          <div id="recommendations-summary-badge" style="display: flex; gap: 8px; align-items: center;"></div>
+        </div>
+
+        <div id="recommendations-main-area">
+          <!-- Dynamic Recommendations Dashboard will be injected here -->
+        </div>
+      </div>
+    </div><!-- /recommendations -->
 
 
   </div><!-- /dashboard -->
