@@ -200,6 +200,181 @@ app.post('/api/profile', async (req, res) => {
   }
 });
 
+// ─── Goals: Create ────────────────────────────────────────────────
+app.post('/api/goals', async (req, res) => {
+  if (!req.session.user)
+    return res.json({ success: false, message: 'Not logged in.' });
+
+  const { goal_name, goal_type, start_weight, target_weight, target_date } = req.body;
+
+  const validTypes = ['weight_loss', 'muscle_gain', 'maintenance'];
+  if (!goal_type || !validTypes.includes(goal_type))
+    return res.json({ success: false, message: 'Invalid goal type.' });
+
+  const sw = parseFloat(start_weight);
+  const tw = parseFloat(target_weight);
+
+  if (isNaN(sw) || sw < 20 || sw > 300)
+    return res.json({ success: false, message: 'Start weight must be between 20 and 300 kg.' });
+  if (isNaN(tw) || tw < 20 || tw > 300)
+    return res.json({ success: false, message: 'Target weight must be between 20 and 300 kg.' });
+  if (goal_type === 'weight_loss' && tw >= sw)
+    return res.json({ success: false, message: 'For weight loss, target weight must be less than start weight.' });
+  if (goal_type === 'muscle_gain' && tw <= sw)
+    return res.json({ success: false, message: 'For muscle gain, target weight must be greater than start weight.' });
+  if (goal_type === 'maintenance' && Math.abs(tw - sw) > 2)
+    return res.json({ success: false, message: 'For maintenance, target weight must be within 2 kg of start weight.' });
+  if (!target_date)
+    return res.json({ success: false, message: 'Target date is required.' });
+
+  const td = new Date(target_date);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if (td <= today)
+    return res.json({ success: false, message: 'Target date must be a future date.' });
+  if (goal_name && goal_name.length > 100)
+    return res.json({ success: false, message: 'Goal name must be 100 characters or fewer.' });
+
+  try {
+    const userId = req.session.user.id;
+    const activeCheck = await pool.query(
+      'SELECT id FROM goals WHERE user_id = $1 AND status = $2',
+      [userId, 'active']
+    );
+    if (activeCheck.rows.length >= 1)
+      return res.json({ success: false, message: 'You already have an active goal. Complete or cancel it before creating a new one.' });
+
+    const result = await pool.query(
+      `INSERT INTO goals (user_id, goal_name, goal_type, start_weight, target_weight, start_date, target_date)
+       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, $6) RETURNING *`,
+      [userId, goal_name || null, goal_type, sw, tw, target_date]
+    );
+    res.json({ success: true, goal: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.json({ success: false, message: 'Server error. Please try again.' });
+  }
+});
+
+// ─── Goals: Fetch All ─────────────────────────────────────────────
+app.get('/api/goals', async (req, res) => {
+  if (!req.session.user)
+    return res.json({ success: false, message: 'Not logged in.' });
+
+  try {
+    const userId = req.session.user.id;
+    const result = await pool.query(
+      `SELECT g.*,
+              (SELECT weight FROM progress_logs
+               WHERE user_id = g.user_id
+               ORDER BY log_date DESC, created_at DESC LIMIT 1) AS current_weight
+       FROM goals g
+       WHERE g.user_id = $1
+       ORDER BY g.created_at DESC`,
+      [userId]
+    );
+    const goals = result.rows.map(g => {
+      const sw = parseFloat(g.start_weight);
+      const tw = parseFloat(g.target_weight);
+      const cw = g.current_weight !== null ? parseFloat(g.current_weight) : sw;
+      let progress_pct = 0;
+      if (sw !== tw) {
+        progress_pct = ((sw - cw) / (sw - tw)) * 100;
+        progress_pct = Math.max(0, Math.min(100, Math.round(progress_pct * 10) / 10));
+      }
+      return { ...g, current_weight: cw, progress_pct };
+    });
+    res.json({ success: true, goals });
+  } catch (err) {
+    console.error(err);
+    res.json({ success: false, message: 'Server error. Please try again.' });
+  }
+});
+
+// ─── Goals: Edit ──────────────────────────────────────────────────
+app.put('/api/goals/:id', async (req, res) => {
+  if (!req.session.user)
+    return res.json({ success: false, message: 'Not logged in.' });
+
+  const { id } = req.params;
+  const { goal_name, target_weight, target_date } = req.body;
+
+  try {
+    const userId = req.session.user.id;
+    const existing = await pool.query(
+      'SELECT * FROM goals WHERE id = $1 AND user_id = $2', [id, userId]
+    );
+    if (existing.rows.length === 0)
+      return res.json({ success: false, message: 'Goal not found.' });
+
+    const goal = existing.rows[0];
+    if (goal.status !== 'active')
+      return res.json({ success: false, message: 'Only active goals can be edited.' });
+
+    if (target_weight !== undefined && target_weight !== '') {
+      const tw = parseFloat(target_weight);
+      const sw = parseFloat(goal.start_weight);
+      if (isNaN(tw) || tw < 20 || tw > 300)
+        return res.json({ success: false, message: 'Target weight must be between 20 and 300 kg.' });
+      if (goal.goal_type === 'weight_loss' && tw >= sw)
+        return res.json({ success: false, message: 'For weight loss, target weight must be less than start weight.' });
+      if (goal.goal_type === 'muscle_gain' && tw <= sw)
+        return res.json({ success: false, message: 'For muscle gain, target weight must be greater than start weight.' });
+      if (goal.goal_type === 'maintenance' && Math.abs(tw - sw) > 2)
+        return res.json({ success: false, message: 'For maintenance, target weight must be within 2 kg of start weight.' });
+    }
+    if (target_date) {
+      const td = new Date(target_date);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      if (td <= today)
+        return res.json({ success: false, message: 'Target date must be a future date.' });
+    }
+
+    const tw = target_weight && target_weight !== '' ? parseFloat(target_weight) : null;
+    const result = await pool.query(
+      `UPDATE goals
+       SET goal_name = COALESCE($1, goal_name),
+           target_weight = COALESCE($2, target_weight),
+           target_date = COALESCE($3, target_date),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4 AND user_id = $5 AND status = 'active'
+       RETURNING *`,
+      [goal_name || null, tw, target_date || null, id, userId]
+    );
+    res.json({ success: true, goal: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.json({ success: false, message: 'Server error. Please try again.' });
+  }
+});
+
+// ─── Goals: Update Status ─────────────────────────────────────────
+app.patch('/api/goals/:id/status', async (req, res) => {
+  if (!req.session.user)
+    return res.json({ success: false, message: 'Not logged in.' });
+
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!['completed', 'cancelled'].includes(status))
+    return res.json({ success: false, message: 'Invalid status. Must be "completed" or "cancelled".' });
+
+  try {
+    const userId = req.session.user.id;
+    const result = await pool.query(
+      `UPDATE goals SET status = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2 AND user_id = $3 AND status = 'active'
+       RETURNING *`,
+      [status, id, userId]
+    );
+    if (result.rows.length === 0)
+      return res.json({ success: false, message: 'Goal not found or is not active.' });
+    res.json({ success: true, goal: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.json({ success: false, message: 'Server error. Please try again.' });
+  }
+});
+
 // ─── Serve SPA ────────────────────────────────────────────────────
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
