@@ -147,12 +147,14 @@ function switchSection(sectionId, btn) {
  
 // ─── Select Workout Day ───────────────────────────────────────────
 function selectDay(day) {
-  const grid    = document.getElementById('workout-grid');
-  const dayInfo = document.getElementById('day-info');
- 
+  const grid       = document.getElementById('workout-grid');
+  const dayInfo    = document.getElementById('day-info');
+  const warmupSec  = document.getElementById('warmup-section');
+
   if (!day) {
-    grid.style.display    = 'none';
-    dayInfo.style.display = 'none';
+    grid.style.display       = 'none';
+    dayInfo.style.display    = 'none';
+    warmupSec.style.display  = 'none';
   } else {
     const dayMap = {
       Monday:    'CHEST',
@@ -163,14 +165,23 @@ function selectDay(day) {
       Saturday:  'LEGS',
       Sunday:    'FULL BODY'
     };
-    grid.style.display    = 'flex';
-    dayInfo.style.display = 'block';
-    dayInfo.textContent   = `${day.toUpperCase()} — ${dayMap[day] || 'SELECT MUSCLE'}`;
+    grid.style.display       = 'flex';
+    dayInfo.style.display    = 'block';
+    warmupSec.style.display  = 'block';
+    dayInfo.textContent      = `${day.toUpperCase()} — ${dayMap[day] || 'SELECT MUSCLE'}`;
   }
 }
  
 // ─── Exercise Data ────────────────────────────────────────────────
 const workoutData = {
+  'Warmup': [
+    { name: 'Jumping Jacks',     video: 'https://www.youtube.com/watch?v=UpH7RmJsmUY' },
+    { name: 'Arm Circles',       video: 'https://www.youtube.com/watch?v=OAg0YGxKPzI' },
+    { name: 'Leg Swings',        video: 'https://www.youtube.com/watch?v=3p8EBPVZ2Iw' },
+    { name: 'Torso Twists',      video: 'https://www.youtube.com/watch?v=ExR0m8W5YOc' },
+    { name: 'Shoulder Rolls',    video: 'https://www.youtube.com/watch?v=2Ew6yq7zZ4A' },
+    { name: 'March in Place',    video: 'https://www.youtube.com/watch?v=4n8F7q9zZ2A' }
+  ],
   'Chest': [
     { name: 'Standard Pushups',  video: 'https://www.youtube.com/watch?v=WDIpL0pjun0' },
     { name: 'Bench Press',       video: 'https://www.youtube.com/shorts/hWbUlkb5Ms4' },
@@ -221,15 +232,15 @@ function openExercise(muscle) {
   const view    = document.getElementById('exercise-view');
   const overlay = document.getElementById('screen-overlay');
   const list    = document.getElementById('ex-list');
- 
+
   document.getElementById('ex-title').textContent = muscle + ' Workouts';
- 
+
   function getYTEmbed(url) {
     if (!url) return '';
     const m = url.match(/(?:v=|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/);
     return m ? `https://www.youtube.com/embed/${m[1]}?rel=0&controls=1&modestbranding=1` : '';
   }
- 
+
   list.innerHTML = (workoutData[muscle] || []).map(ex => {
     const yt = getYTEmbed(ex.video || '');
     const mediaHTML = yt
@@ -237,18 +248,51 @@ function openExercise(muscle) {
       : ex.video
         ? `<video controls preload="metadata" src="${ex.video}"></video>`
         : `<img src="${ex.img || ''}" alt="${ex.name}" onerror="this.src='https://via.placeholder.com/300x200?text=Loading...'">`;
- 
+
     return `
       <div class="exercise-item">
         <h4>${ex.name}</h4>
         ${mediaHTML}
       </div>`;
   }).join('');
- 
+
   view.style.display    = 'block';
   overlay.style.display = 'block';
 }
- 
+
+// ─── Open Warmup Exercises ────────────────────────────────────────
+function openWarmup() {
+  const view = document.getElementById('exercise-view');
+  const overlay = document.getElementById('screen-overlay');
+  const list = document.getElementById('ex-list');
+
+  document.getElementById('ex-title').textContent = 'Warmup Exercises';
+
+  function getYTEmbed(url) {
+    if (!url) return '';
+    const m = url.match(/(?:v=|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/);
+    return m ? `https://www.youtube.com/embed/${m[1]}?rel=0&controls=1&modestbranding=1` : '';
+  }
+
+  list.innerHTML = (workoutData['Warmup'] || []).map(ex => {
+    const yt = getYTEmbed(ex.video || '');
+    const mediaHTML = yt
+      ? `<div class="video-wrap"><iframe src="${yt}" allowfullscreen></iframe></div>`
+      : ex.video
+        ? `<video controls preload="metadata" src="${ex.video}"></video>`
+        : `<img src="${ex.img || ''}" alt="${ex.name}" onerror="this.src='https://via.placeholder.com/300x200?text=Loading...'">`;
+
+    return `
+<div class="exercise-item">
+<h4>${ex.name}</h4>
+${mediaHTML}
+</div>`;
+  }).join('');
+
+  view.style.display = 'block';
+  overlay.style.display = 'block';
+}
+
 // ─── Close Exercise Popup ─────────────────────────────────────────
 function closeEx() {
   document.getElementById('exercise-view').style.display = 'none';

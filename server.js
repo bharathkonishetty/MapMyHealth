@@ -1,18 +1,15 @@
+require('./db/env')();
 const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
-const { Pool } = require('pg');
 const path = require('path');
+const db = require('./db/index');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ─── PostgreSQL Connection ────────────────────────────────────────
-const pool = new Pool(
-  process.env.DATABASE_URL
-    ? { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }
-    : { user: 'postgres', host: 'localhost', database: 'mapmyhealth', password: 'postgre_bharath', port: 5432 }
-);
+const pool = db.pool;
 
 // ─── Middleware ───────────────────────────────────────────────────
 app.use(express.json());
@@ -20,7 +17,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
-  secret: 'beginner-fit-secret-2024',
+  secret: process.env.SESSION_SECRET || 'beginner-fit-secret-2024',
   resave: false,
   saveUninitialized: false,
   cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 }
@@ -64,7 +61,7 @@ app.post('/api/register', async (req, res) => {
 
   try {
     // Check duplicate username
-    const nameCheck = await pool.query('SELECT id FROM users WHERE LOWER(name) = $1', [name.toLowerCase()]);
+    const nameCheck = await pool.query('SELECT id FROM users WHERE LOWER(username) = $1', [name.toLowerCase()]);
     if (nameCheck.rows.length > 0)
       return res.json({ success: false, message: 'Username already registered.' });
 
@@ -75,10 +72,13 @@ app.post('/api/register', async (req, res) => {
 
     const hashedPass = await bcrypt.hash(password, 10);
 
-    await pool.query(
-      'INSERT INTO users (name, email, mobile, password) VALUES ($1, $2, $3, $4)',
+    // Create user and profile in transaction/sequence
+    const userRes = await pool.query(
+      'INSERT INTO users (username, email, mobile, password_hash) VALUES ($1, $2, $3, $4) RETURNING id',
       [name, email.toLowerCase(), mobile, hashedPass]
     );
+    const userId = userRes.rows[0].id;
+    await pool.query('INSERT INTO user_profiles (user_id) VALUES ($1)', [userId]);
 
     res.json({ success: true, message: 'Registered successfully! Please login.' });
 
@@ -99,7 +99,12 @@ app.post('/api/login', async (req, res) => {
     const id = identifier.trim().toLowerCase();
 
     const result = await pool.query(
-      'SELECT * FROM users WHERE LOWER(name) = $1 OR email = $1',
+      `SELECT u.id, u.username, u.email, u.mobile, u.password_hash, 
+              p.age, p.height_cm,
+              (SELECT weight FROM progress_logs WHERE user_id = u.id ORDER BY log_date DESC, created_at DESC LIMIT 1) as weight
+       FROM users u
+       LEFT JOIN user_profiles p ON u.id = p.user_id
+       WHERE LOWER(u.username) = $1 OR u.email = $1`,
       [id]
     );
 
@@ -107,18 +112,19 @@ app.post('/api/login', async (req, res) => {
       return res.json({ success: false, message: 'Invalid username/email or password.' });
 
     const user = result.rows[0];
-    const match = await bcrypt.compare(password, user.password);
+    const match = await bcrypt.compare(password, user.password_hash);
 
     if (!match)
       return res.json({ success: false, message: 'Invalid username/email or password.' });
 
     req.session.user = {
-      name: user.name,
+      id: user.id,
+      name: user.username,
       email: user.email,
       mobile: user.mobile,
-      age: user.age || '',
-      height: user.height || '',
-      weight: user.weight || ''
+      age: user.age !== null && user.age !== undefined ? user.age : '',
+      height: user.height_cm !== null && user.height_cm !== undefined ? user.height_cm : '',
+      weight: user.weight !== null && user.weight !== undefined ? user.weight : ''
     };
 
     res.json({ success: true, user: req.session.user });
@@ -152,14 +158,39 @@ app.post('/api/profile', async (req, res) => {
   const { age, height, weight } = req.body;
 
   try {
+    const userCheck = await pool.query('SELECT id FROM users WHERE LOWER(username) = $1', [req.session.user.name.toLowerCase()]);
+    if (userCheck.rows.length === 0)
+      return res.json({ success: false, message: 'User not found.' });
+
+    const userId = userCheck.rows[0].id;
+    const parsedAge = age && age.toString().trim() !== '' ? parseInt(age, 10) : null;
+    const parsedHeight = height && height.toString().trim() !== '' ? parseFloat(height) : null;
+    const parsedWeight = weight && weight.toString().trim() !== '' ? parseFloat(weight) : null;
+
+    // Update profiles table
     await pool.query(
-      'UPDATE users SET age = $1, height = $2, weight = $3 WHERE LOWER(name) = $4',
-      [age || '', height || '', weight || '', req.session.user.name.toLowerCase()]
+      `INSERT INTO user_profiles (user_id, age, height_cm) 
+       VALUES ($1, $2, $3) 
+       ON CONFLICT (user_id) 
+       DO UPDATE SET age = EXCLUDED.age, height_cm = EXCLUDED.height_cm`,
+      [userId, parsedAge, parsedHeight]
     );
 
-    req.session.user.age = age || '';
-    req.session.user.height = height || '';
-    req.session.user.weight = weight || '';
+    // Insert new weight log if provided
+    if (parsedWeight !== null) {
+      const today = new Date().toISOString().split('T')[0];
+      await pool.query(
+        `INSERT INTO progress_logs (user_id, log_date, weight) 
+         VALUES ($1, $2, $3) 
+         ON CONFLICT (user_id, log_date) 
+         DO UPDATE SET weight = EXCLUDED.weight`,
+        [userId, today, parsedWeight]
+      );
+    }
+
+    req.session.user.age = parsedAge !== null ? parsedAge : '';
+    req.session.user.height = parsedHeight !== null ? parsedHeight : '';
+    req.session.user.weight = parsedWeight !== null ? parsedWeight : '';
 
     res.json({ success: true });
 
