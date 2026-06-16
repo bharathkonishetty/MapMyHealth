@@ -112,6 +112,7 @@ function showDashboard(user) {
   loadAnalytics();
   loadCheckin();
   loadHealthScore();
+  loadRecommendations();
 }
  
 // ─── Save Profile Stats ───────────────────────────────────────────
@@ -128,6 +129,7 @@ async function saveProfile() {
     loadAnalytics();
     loadCheckin();
     loadHealthScore();
+    loadRecommendations();
   }
 }
  
@@ -170,6 +172,8 @@ function switchSection(sectionId, btn) {
     loadCheckin();
   } else if (sectionId === 'healthscore') {
     loadHealthScore();
+  } else if (sectionId === 'recommendations') {
+    loadRecommendations();
   }
 }
  
@@ -562,6 +566,7 @@ async function submitGoal() {
     loadAnalytics();
     loadCheckin();
     loadHealthScore();
+    loadRecommendations();
     showToast(editId ? '✓ Goal updated.' : '✓ Goal created! Your journey has begun.');
   } else {
     msg.textContent = result.message;
@@ -586,6 +591,7 @@ async function updateGoalStatus(goalId, status) {
     loadAnalytics();
     loadCheckin();
     loadHealthScore();
+    loadRecommendations();
     showToast(status === 'completed' ? '🎉 Goal completed! Well done.' : 'Goal cancelled.');
   } else {
     showToast('Error: ' + result.message);
@@ -1520,6 +1526,7 @@ async function saveCheckin(e) {
       loadAnalytics();
       loadCheckin();
       loadHealthScore();
+      loadRecommendations();
     } else {
       if (msg) {
         msg.textContent = result.message || 'Validation error.';
@@ -1716,6 +1723,114 @@ function renderHealthScoreView(data) {
       }, Math.max(10, stepTime));
     }
   }, 100);
+}
+
+// ─── Recommendations: Load Data (Phase 7) ───────────────────────────
+async function loadRecommendations() {
+  const container = document.getElementById('recommendations-main-area');
+  const badgeContainer = document.getElementById('recommendations-summary-badge');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="loading-container" style="padding: 40px; text-align: center;">
+      <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: rgba(255,255,255,0.4);"></i>
+      <p style="margin-top: 10px; color: rgba(255,255,255,0.4); font-size: 13px;">Analyzing your health data...</p>
+    </div>
+  `;
+
+  try {
+    const response = await fetch('/api/recommendations').then(r => r.json());
+    if (response.success) {
+      renderRecommendationsView(response);
+    } else {
+      container.innerHTML = `<p class="msg error" style="margin: 20px;">Error loading recommendations: ${escapeHtml(response.message)}</p>`;
+    }
+  } catch (err) {
+    console.error(err);
+    container.innerHTML = `<p class="msg error" style="margin: 20px;">Failed to connect to recommendation server.</p>`;
+  }
+}
+
+function renderRecommendationsView(data) {
+  const container = document.getElementById('recommendations-main-area');
+  const badgeContainer = document.getElementById('recommendations-summary-badge');
+  if (!container || !badgeContainer) return;
+
+  const score = data.healthScore;
+  const list = data.recommendations || [];
+  
+  // Calculate counts
+  const totalCount = list.length;
+  const highCount = list.filter(r => r.priority === 'high').length;
+
+  // Render header summary badges
+  let scoreClass = 'needs-attention';
+  if (score >= 90) scoreClass = 'elite';
+  else if (score >= 80) scoreClass = 'excellent';
+  else if (score >= 70) scoreClass = 'good';
+  else if (score >= 60) scoreClass = 'fair';
+
+  badgeContainer.innerHTML = `
+    <span class="rating-badge ${scoreClass}" style="padding: 4px 12px; font-weight: 700; font-size: 13px; border-radius: 20px;">Score: ${score}</span>
+    <span style="font-size: 13px; background: rgba(255,255,255,0.06); padding: 4px 12px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.85);">
+      Total: <strong>${totalCount}</strong>
+    </span>
+    <span style="font-size: 13px; background: ${highCount > 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255,255,255,0.06)'}; color: ${highCount > 0 ? '#ef4444' : 'rgba(255,255,255,0.85)'}; padding: 4px 12px; border-radius: 20px; border: 1px solid ${highCount > 0 ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255,255,255,0.1)'};">
+      High Priority: <strong>${highCount}</strong>
+    </span>
+  `;
+
+  if (totalCount === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 40px; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px;">
+        <i class="fas fa-check-circle" style="font-size: 32px; color: var(--accent-green); margin-bottom: 12px;"></i>
+        <p style="margin: 0; font-size: 15px; color: rgba(255,255,255,0.85);">No recommendations at this time.</p>
+        <p style="margin: 8px 0 0 0; font-size: 12.5px; color: rgba(255,255,255,0.45);">Your health scores and progress check-ins are fully optimized!</p>
+      </div>
+    `;
+    return;
+  }
+
+  const categoryLabels = {
+    goal_progress: 'Goal Progress',
+    activity: 'Activity',
+    hydration: 'Hydration',
+    recovery: 'Recovery',
+    consistency: 'Consistency'
+  };
+
+  const priorityLabels = {
+    high: 'HIGH',
+    medium: 'MEDIUM',
+    low: 'LOW'
+  };
+
+  container.innerHTML = `
+    <div class="recommendations-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; margin-top: 10px;">
+      ${list.map(rec => {
+        const catLabel = categoryLabels[rec.category] || rec.category;
+        const prioLabel = priorityLabels[rec.priority] || rec.priority;
+        return `
+          <div class="recommendation-card priority-${rec.priority}" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s, background-color 0.2s;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span class="prio-badge badge-${rec.priority}" style="font-size: 10.5px; font-weight: 800; padding: 2px 8px; border-radius: 6px; letter-spacing: 0.5px;">${prioLabel}</span>
+                <span style="font-size: 11.5px; color: rgba(255,255,255,0.4); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">${catLabel}</span>
+              </div>
+              <h3 style="margin: 0 0 8px 0; font-size: 15.5px; font-weight: 600; color: #fff;">${escapeHtml(rec.title)}</h3>
+              <p style="margin: 0 0 16px 0; font-size: 13px; line-height: 1.45; color: rgba(255,255,255,0.7); font-style: italic;">
+                ${escapeHtml(rec.description)}
+              </p>
+            </div>
+            <div style="background: rgba(255,255,255,0.02); border-top: 1px solid rgba(255,255,255,0.04); padding: 10px 12px; margin: 4px -18px -18px -18px; border-radius: 0 0 16px 16px;">
+              <span style="display: block; font-size: 10.5px; font-weight: 700; color: rgba(255,255,255,0.4); text-transform: uppercase; margin-bottom: 2px; letter-spacing: 0.3px;">Expected Benefit</span>
+              <span style="font-size: 11.5px; color: rgba(255,255,255,0.8); line-height: 1.35;">${escapeHtml(rec.expectedBenefit)}</span>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
 }
 
  
