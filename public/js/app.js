@@ -109,6 +109,7 @@ function showDashboard(user) {
 
   loadGoals();
   loadJourney();
+  loadAnalytics();
 }
  
 // ─── Save Profile Stats ───────────────────────────────────────────
@@ -122,6 +123,7 @@ async function saveProfile() {
     showToast('Profile updated ✓');
     loadGoals();
     loadJourney();
+    loadAnalytics();
   }
 }
  
@@ -158,6 +160,8 @@ function switchSection(sectionId, btn) {
 
   if (sectionId === 'journey') {
     loadJourney();
+  } else if (sectionId === 'analytics') {
+    loadAnalytics();
   }
 }
  
@@ -547,6 +551,7 @@ async function submitGoal() {
     closeGoalModal();
     await loadGoals();
     loadJourney();
+    loadAnalytics();
     showToast(editId ? '✓ Goal updated.' : '✓ Goal created! Your journey has begun.');
   } else {
     msg.textContent = result.message;
@@ -568,6 +573,7 @@ async function updateGoalStatus(goalId, status) {
   if (result.success) {
     await loadGoals();
     loadJourney();
+    loadAnalytics();
     showToast(status === 'completed' ? '🎉 Goal completed! Well done.' : 'Goal cancelled.');
   } else {
     showToast('Error: ' + result.message);
@@ -884,6 +890,320 @@ function showJourneyTooltip(title, desc, isCompleted) {
   window.tooltipTimer = setTimeout(() => {
     tooltip.style.display = 'none';
   }, 4000);
+}
+
+// ─── Analytics: Load (Phase 4) ──────────────────────────────────────
+async function loadAnalytics() {
+  const container = document.getElementById('analytics-main-area');
+  const badgeContainer = document.getElementById('analytics-status-badge-container');
+  if (!container) return;
+
+  if (badgeContainer) badgeContainer.innerHTML = '';
+  container.innerHTML = `
+    <div style="text-align:center;padding:50px 0;color:rgba(255,255,255,0.4);">
+      <i class="fas fa-spinner fa-spin" style="font-size:2rem;margin-bottom:12px;"></i>
+      <p>Loading progress analytics...</p>
+    </div>`;
+
+  try {
+    const response = await fetch('/api/progress/analytics').then(r => r.json());
+    if (response.success) {
+      renderAnalyticsView(response);
+    } else {
+      container.innerHTML = `
+        <div class="journey-empty-card">
+          <i class="fas fa-circle-exclamation" style="color:var(--danger-red);"></i>
+          <h3>Failed to load analytics</h3>
+          <p>${response.message || 'Please refresh the page.'}</p>
+        </div>`;
+    }
+  } catch (err) {
+    console.error(err);
+    container.innerHTML = `
+      <div class="journey-empty-card">
+        <i class="fas fa-circle-exclamation" style="color:var(--danger-red);"></i>
+        <h3>Connection error</h3>
+        <p>Could not connect to server. Please try again.</p>
+      </div>`;
+  }
+}
+
+// ─── Analytics: Render (Phase 4) ────────────────────────────────────
+function renderAnalyticsView(data) {
+  const container = document.getElementById('analytics-main-area');
+  const badgeContainer = document.getElementById('analytics-status-badge-container');
+  if (!container) return;
+
+  if (!data.activeGoal) {
+    if (badgeContainer) badgeContainer.innerHTML = '';
+    container.innerHTML = `
+      <div class="journey-empty-card">
+        <i class="fas fa-chart-column"></i>
+        <h3>No Active Goal</h3>
+        <p>Analytics requires an active goal parameters to perform velocity trends and completion forecasts. Create an active goal to get started.</p>
+        <button class="btn-main" style="width:auto;padding:12px 28px;" onclick="switchSection('goals', document.querySelector('.nav-tab[onclick*=\\'goals\\']'))">
+          <i class="fas fa-plus"></i>&nbsp; Set My Active Goal
+        </button>
+      </div>`;
+    return;
+  }
+
+  // Populate Header Status Badge
+  if (badgeContainer) {
+    badgeContainer.innerHTML = `<span class="badge-status-${data.forecast.status}">${data.forecast.statusLabel}</span>`;
+  }
+
+  const g = data.activeGoal;
+  const cw = data.currentWeight;
+  const pct = data.progressPct;
+  const history = data.weightHistory || [];
+
+  // Estimated Date display with Confidence badge immediately next to it
+  const estDateStr = data.forecast.estimatedDate === 'N/A' || data.forecast.estimatedDate === 'Infinite' || data.forecast.estimatedDate === 'Stable'
+    ? data.forecast.estimatedDate
+    : formatDate(data.forecast.estimatedDate);
+
+  const confidenceClass = data.forecast.confidence === 'High' ? 'ahead' : (data.forecast.confidence === 'Medium' ? 'ontrack' : 'insufficient');
+  const confidenceBadge = `<span class="badge-status-${confidenceClass}" style="margin-left: 8px; padding: 2px 8px; font-size: 10px; display: inline-flex; vertical-align: middle;">${data.forecast.confidence} Confidence</span>`;
+
+  let varianceText = 'N/A';
+  let varianceClass = '';
+  if (data.forecast.daysDifference !== null) {
+    if (data.forecast.daysDifference > 3) {
+      varianceText = `${Math.round(data.forecast.daysDifference)} days ahead`;
+      varianceClass = 'val highlight';
+    } else if (data.forecast.daysDifference < -3) {
+      varianceText = `${Math.round(Math.abs(data.forecast.daysDifference))} days behind`;
+      varianceClass = 'val warning-gold';
+    } else {
+      varianceText = 'On track';
+      varianceClass = 'val highlight';
+    }
+  }
+
+  container.innerHTML = `
+    <div class="analytics-grid">
+      <!-- Column A: Progress & Projections Metrics Cards -->
+      <div class="metrics-panel-stack">
+        
+        <!-- Card 1: Goal Progress Stats -->
+        <div class="analytics-card">
+          <h3>Goal & Weight Progress</h3>
+          <div class="metrics-panel-stack" style="gap:10px;">
+            <div class="insight-stat-row">
+              <span class="label">Current Goal</span>
+              <span class="val">${escapeHtml(g.goal_name || goalTypeLabel(g.goal_type))}</span>
+            </div>
+            <div class="insight-stat-row">
+              <span class="label">Starting Weight</span>
+              <span class="val">${g.start_weight} kg</span>
+            </div>
+            <div class="insight-stat-row">
+              <span class="label">Current Weight</span>
+              <span class="val highlight">${cw} kg</span>
+            </div>
+            <div class="insight-stat-row">
+              <span class="label">Target Weight</span>
+              <span class="val" style="color:var(--accent-green);">${g.target_weight} kg</span>
+            </div>
+          </div>
+          
+          <div class="analytics-progress-wrapper">
+            <div class="analytics-progress-label">
+              <span>Goal Completion Progress</span>
+              <span style="font-weight:700;color:var(--primary-teal);">${pct}%</span>
+            </div>
+            <div class="analytics-progress-bg">
+              <div class="analytics-progress-fill" style="width:${pct}%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2: Timeline & Forecast Projections -->
+        <div class="analytics-card">
+          <h3>Goal Completion Forecast</h3>
+          <div class="metrics-panel-stack" style="gap:10px;">
+            <div class="insight-stat-row">
+              <span class="label">Target Completion Date</span>
+              <span class="val">${formatDate(g.target_date)}</span>
+            </div>
+            <div class="insight-stat-row">
+              <span class="label">Calendar Days Remaining</span>
+              <span class="val">${data.timeline.daysRemaining} days</span>
+            </div>
+            <div class="insight-stat-row">
+              <span class="label">Projected Date</span>
+              <span class="val" style="display: flex; align-items: center;">
+                ${estDateStr}
+                ${confidenceBadge}
+              </span>
+            </div>
+            <div class="insight-stat-row">
+              <span class="label">Schedule Variance</span>
+              <span class="${varianceClass || 'val'}">${varianceText}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column B: Interactive Weight Chart & Weekly Velocity Insights -->
+      <div class="metrics-panel-stack">
+        <div class="analytics-card">
+          <h3>30-Day Weight Trend</h3>
+          <div class="chart-canvas-container" id="weight-chart-container">
+            <!-- Custom SVG weight chart will draw here -->
+          </div>
+
+          <!-- Velocity Insights Guidance Box -->
+          <div class="coach-guidance-box" style="margin-top: 18px; display: flex; align-items: flex-start; gap: 14px;">
+            <i class="fas fa-chart-line" style="font-size: 1.25rem; color: var(--primary-teal); margin-top: 2px;"></i>
+            <div>
+              <p style="margin: 0; line-height: 1.5; font-size: 13px;">${escapeHtml(data.forecast.insights)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Draw Weight Chart with history logs
+  drawWeightChart(history);
+}
+
+// ─── Analytics: Custom SVG Weight Chart (Phase 4) ────────────────────
+function drawWeightChart(logs) {
+  const chartContainer = document.getElementById('weight-chart-container');
+  if (!chartContainer) return;
+
+  if (!logs || logs.length < 2) {
+    chartContainer.innerHTML = `
+      <div style="height:100%; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,0.35); font-size:13px; text-align:center; padding: 20px; border: 1px dashed rgba(255,255,255,0.08); border-radius: 12px; min-height: 160px;">
+        <div>
+          <i class="fas fa-chart-area" style="font-size: 24px; margin-bottom: 8px; opacity: 0.5;"></i>
+          <p>Please log your weight on at least two different days to generate weight trend visualization.</p>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Setup dimensions
+  const width = 500;
+  const height = 200;
+  const padLeft = 45;
+  const padRight = 20;
+  const padTop = 20;
+  const padBottom = 30;
+
+  const chartWidth = width - padLeft - padRight;
+  const chartHeight = height - padTop - padBottom;
+
+  // Find boundaries
+  const weights = logs.map(l => l.weight);
+  const minW = Math.min(...weights);
+  const maxW = Math.max(...weights);
+
+  // Buffer range to prevent collapse
+  const weightRange = maxW - minW;
+  const rangeMin = weightRange === 0 ? minW - 2 : minW - (weightRange * 0.1 || 1);
+  const rangeMax = weightRange === 0 ? maxW + 2 : maxW + (weightRange * 0.1 || 1);
+  const delta = rangeMax - rangeMin;
+
+  // Calculate scaling coordinates
+  const points = logs.map((log, i) => {
+    const x = padLeft + (i / (logs.length - 1)) * chartWidth;
+    const y = height - padBottom - ((log.weight - rangeMin) / delta) * chartHeight;
+    return { x, y, log_date: log.log_date, weight: log.weight };
+  });
+
+  // Build SVG Content
+  // 1. Grid guide values
+  const yValTop = rangeMax;
+  const yValMid = (rangeMin + rangeMax) / 2;
+  const yValBot = rangeMin;
+
+  const yPosTop = padTop;
+  const yPosMid = padTop + chartHeight / 2;
+  const yPosBot = height - padBottom;
+
+  // 2. Build paths
+  let linePath = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 1; i < points.length; i++) {
+    linePath += ` L ${points[i].x} ${points[i].y}`;
+  }
+
+  let fillPath = `${linePath} L ${points[points.length - 1].x} ${height - padBottom} L ${points[0].x} ${height - padBottom} Z`;
+
+  function formatDateShort(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  }
+
+  const svgHTML = `
+    <svg viewBox="0 0 500 200" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="overflow: visible;">
+      <defs>
+        <linearGradient id="chart-glow-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--primary-teal)" stop-opacity="0.25" />
+          <stop offset="100%" stop-color="var(--primary-teal)" stop-opacity="0.0" />
+        </linearGradient>
+      </defs>
+
+      <!-- Horizontal Grid Lines -->
+      <line x1="${padLeft}" y1="${yPosTop}" x2="${width - padRight}" y2="${yPosTop}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4" />
+      <line x1="${padLeft}" y1="${yPosMid}" x2="${width - padRight}" y2="${yPosMid}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4" />
+      <line x1="${padLeft}" y1="${yPosBot}" x2="${width - padRight}" y2="${yPosBot}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4" />
+
+      <!-- Y-Axis Labels -->
+      <text x="${padLeft - 8}" y="${yPosTop + 3}" fill="rgba(255,255,255,0.4)" font-size="9px" text-anchor="end" font-family="Inter, sans-serif">${yValTop.toFixed(1)}</text>
+      <text x="${padLeft - 8}" y="${yPosMid + 3}" fill="rgba(255,255,255,0.4)" font-size="9px" text-anchor="end" font-family="Inter, sans-serif">${yValMid.toFixed(1)}</text>
+      <text x="${padLeft - 8}" y="${yPosBot + 3}" fill="rgba(255,255,255,0.4)" font-size="9px" text-anchor="end" font-family="Inter, sans-serif">${yValBot.toFixed(1)}</text>
+
+      <!-- Gradient Area Under Curve -->
+      <path d="${fillPath}" fill="url(#chart-glow-grad)" />
+
+      <!-- Main Trend Line -->
+      <path d="${linePath}" fill="none" stroke="var(--primary-teal)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+
+      <!-- Data Nodes -->
+      ${points.map((pt, idx) => `
+        <g class="chart-point-group" style="cursor: pointer;"
+           onmouseover="showChartTooltip(event, '${escapeHtml(formatDate(pt.log_date))}', '${pt.weight.toFixed(1)} kg')"
+           onmouseout="hideChartTooltip()">
+          <circle cx="${pt.x}" cy="${pt.y}" r="4" class="chart-point-marker" fill="var(--primary-teal)" stroke="#020617" stroke-width="1.5" />
+          <!-- Larger transparent hover target -->
+          <circle cx="${pt.x}" cy="${pt.y}" r="12" fill="transparent" />
+        </g>
+      `).join('')}
+
+      <!-- Timeline X-Axis Dates -->
+      <text x="${padLeft}" y="${height - 10}" fill="rgba(255,255,255,0.4)" font-size="9px" text-anchor="start" font-family="Inter, sans-serif">${formatDateShort(points[0].log_date)}</text>
+      <text x="${width - padRight}" y="${height - 10}" fill="rgba(255,255,255,0.4)" font-size="9px" text-anchor="end" font-family="Inter, sans-serif">${formatDateShort(points[points.length - 1].log_date)}</text>
+    </svg>
+    <div class="chart-tooltip" id="chart-tooltip"></div>
+  `;
+
+  chartContainer.innerHTML = svgHTML;
+}
+
+// ─── Analytics: Tooltip Hover Handler (Phase 4) ──────────────────────
+function showChartTooltip(e, dateStr, weightStr) {
+  const tooltip = document.getElementById('chart-tooltip');
+  const container = document.getElementById('weight-chart-container');
+  if (!tooltip || !container) return;
+
+  const rect = container.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  tooltip.innerHTML = `<strong>${weightStr}</strong><br/><span style="color:rgba(255,255,255,0.6);font-size:10px;">${dateStr}</span>`;
+  tooltip.style.left = `${x}px`;
+  tooltip.style.top = `${y}px`;
+  tooltip.style.display = 'block';
+}
+
+function hideChartTooltip() {
+  const tooltip = document.getElementById('chart-tooltip');
+  if (tooltip) tooltip.style.display = 'none';
 }
 
  
