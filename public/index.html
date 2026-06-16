@@ -80,9 +80,11 @@
     <!-- Navigation Tabs -->
     <div class="nav-tabs">
       <button class="nav-tab active" onclick="switchSection('workouts', this)">WORKOUTS</button>
+      <button class="nav-tab"        onclick="switchSection('healthscore', this)">HEALTH SCORE</button>
       <button class="nav-tab"        onclick="switchSection('goals', this)">GOALS</button>
       <button class="nav-tab"        onclick="switchSection('journey', this)">JOURNEY MAP</button>
       <button class="nav-tab"        onclick="switchSection('analytics', this)">ANALYTICS</button>
+      <button class="nav-tab"        onclick="switchSection('checkin', this)">DAILY CHECK-IN</button>
       <button class="nav-tab"        onclick="switchSection('diet', this)">DIET</button>
       <button class="nav-tab"        onclick="switchSection('about', this)">ABOUT</button>
       <button class="nav-tab"        onclick="switchSection('help', this)">HELP</button>
@@ -513,6 +515,36 @@
         </div>
       </div>
     </div><!-- /analytics -->
+
+
+    <!-- ─── DAILY CHECK-IN SECTION ────────────────────────────────── -->
+    <div id="checkin" class="section-content">
+      <div class="journey-section-inner">
+        <div class="journey-header">
+          <h2>Daily Check-In</h2>
+          <div id="checkin-streak-badge-container" style="display: flex; gap: 8px; align-items: center;"></div>
+        </div>
+
+        <div id="checkin-main-area">
+          <!-- Dynamic Check-In Form will be injected here -->
+        </div>
+      </div>
+    </div><!-- /checkin -->
+
+
+    <!-- ─── HEALTH SCORE SECTION ──────────────────────────────────── -->
+    <div id="healthscore" class="section-content">
+      <div class="journey-section-inner">
+        <div class="journey-header">
+          <h2>Health Score</h2>
+          <div id="healthscore-badge-container"></div>
+        </div>
+
+        <div id="healthscore-main-area">
+          <!-- Dynamic Health Score Dashboard will be injected here -->
+        </div>
+      </div>
+    </div><!-- /healthscore -->
 
 
   </div><!-- /dashboard -->
