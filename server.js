@@ -512,6 +512,215 @@ app.get('/api/journey/map', async (req, res) => {
   }
 });
 
+// ─── Progress Analytics & Projections (Phase 4) ────────────────────
+app.get('/api/progress/analytics', async (req, res) => {
+  if (!req.session.user)
+    return res.json({ success: false, message: 'Not logged in.' });
+
+  try {
+    const userId = req.session.user.id;
+
+    // 1. Fetch active goal
+    const goalRes = await pool.query(
+      `SELECT * FROM goals WHERE user_id = $1 AND status = 'active' LIMIT 1`,
+      [userId]
+    );
+
+    if (goalRes.rows.length === 0) {
+      return res.json({ success: true, activeGoal: null, message: 'No active goal found.' });
+    }
+
+    const activeGoal = goalRes.rows[0];
+
+    // 2. Fetch past 30 days of weight logs (excluding nulls)
+    const logsRes = await pool.query(
+      `SELECT log_date::text, weight FROM progress_logs
+       WHERE user_id = $1 AND log_date >= CURRENT_DATE - INTERVAL '29 days'
+       AND weight IS NOT NULL
+       ORDER BY log_date ASC`,
+      [userId]
+    );
+
+    const weightHistory = logsRes.rows.map(row => ({
+      log_date: row.log_date,
+      weight: parseFloat(row.weight)
+    }));
+
+    // 3. Fetch latest weight log
+    const latestWeightRes = await pool.query(
+      `SELECT weight FROM progress_logs
+       WHERE user_id = $1 AND weight IS NOT NULL
+       ORDER BY log_date DESC, created_at DESC LIMIT 1`,
+      [userId]
+    );
+
+    const sw = parseFloat(activeGoal.start_weight);
+    const tw = parseFloat(activeGoal.target_weight);
+    const currentWeight = latestWeightRes.rows.length > 0
+      ? parseFloat(latestWeightRes.rows[0].weight)
+      : sw;
+
+    // 4. Calculate progress percentage
+    let progressPct = 0;
+    const goalType = activeGoal.goal_type;
+
+    if (goalType === 'weight_loss') {
+      if (sw !== tw) {
+        progressPct = ((sw - currentWeight) / (sw - tw)) * 100;
+      }
+    } else if (goalType === 'muscle_gain') {
+      if (sw !== tw) {
+        progressPct = ((currentWeight - sw) / (tw - sw)) * 100;
+      }
+    } else if (goalType === 'maintenance') {
+      const startMs = new Date(activeGoal.start_date).getTime();
+      const targetMs = new Date(activeGoal.target_date).getTime();
+      const nowMs = Math.min(targetMs, Math.max(startMs, Date.now()));
+      if (targetMs !== startMs) {
+        progressPct = ((nowMs - startMs) / (targetMs - startMs)) * 100;
+      } else {
+        progressPct = 100;
+      }
+    }
+    progressPct = Math.max(0, Math.min(100, Math.round(progressPct * 10) / 10));
+
+    // 5. Calculate Timeline & Calendar Days Remaining
+    const startDate = new Date(activeGoal.start_date);
+    const targetDate = new Date(activeGoal.target_date);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+
+    const totalDays = Math.max(1, Math.round((targetDate - startDate) / (1000 * 60 * 60 * 24)));
+    const daysElapsed = Math.max(0, Math.round((today - startDate) / (1000 * 60 * 60 * 24)));
+    const daysRemaining = Math.max(0, Math.round((targetDate - today) / (1000 * 60 * 60 * 24)));
+    const timePct = Math.min(100, Math.round((daysElapsed / totalDays) * 1000) / 10);
+
+    // 6. Calculate Velocity & Forecast Projections
+    let weeklyRate = 0;
+    let requiredRate = 0;
+    let onTrack = false;
+    
+    let forecastStatus = 'insufficient'; // 'ahead' | 'ontrack' | 'behind' | 'insufficient'
+    let forecastLabel = 'Insufficient Data';
+    let estimatedDate = 'N/A';
+    let daysDifference = null;
+    let confidence = 'Low';
+    let forecastInsights = 'Please log your weight at least twice over a 3-day span to activate weekly rate trends and completion forecasts.';
+
+    const weightLogsCount = weightHistory.length;
+
+    if (weightLogsCount >= 2) {
+      const earliest = weightHistory[0];
+      const latest = weightHistory[weightLogsCount - 1];
+      const dateDiffDays = Math.round((new Date(latest.log_date) - new Date(earliest.log_date)) / (1000 * 60 * 60 * 24));
+
+      // Calculate confidence rating based on log counts
+      if (weightLogsCount >= 10) {
+        confidence = 'High';
+      } else if (weightLogsCount >= 3) {
+        confidence = 'Medium';
+      } else {
+        confidence = 'Low';
+      }
+
+      if (dateDiffDays >= 3) {
+        const weightDiff = latest.weight - earliest.weight;
+        weeklyRate = Math.round((weightDiff / dateDiffDays * 7) * 100) / 100;
+
+        const weightRemaining = Math.abs(currentWeight - tw);
+        
+        if (daysRemaining > 0) {
+          requiredRate = Math.round((weightRemaining / daysRemaining * 7) * 100) / 100;
+        }
+
+        // Validate direction of progression
+        let isMovingTowardsGoal = false;
+        let rateTowardsGoal = 0;
+
+        if (goalType === 'weight_loss' && weeklyRate < 0) {
+          isMovingTowardsGoal = true;
+          rateTowardsGoal = -weeklyRate;
+        } else if (goalType === 'muscle_gain' && weeklyRate > 0) {
+          isMovingTowardsGoal = true;
+          rateTowardsGoal = weeklyRate;
+        } else if (goalType === 'maintenance') {
+          isMovingTowardsGoal = Math.abs(currentWeight - tw) <= 2;
+          rateTowardsGoal = 1; // dummy velocity value for stability evaluation
+        }
+
+        if (isMovingTowardsGoal && rateTowardsGoal > 0) {
+          let estDaysRemaining = 0;
+          if (goalType === 'maintenance') {
+            estDaysRemaining = daysRemaining;
+          } else {
+            estDaysRemaining = Math.ceil(weightRemaining / (rateTowardsGoal / 7));
+          }
+
+          const estDate = new Date();
+          estDate.setDate(estDate.getDate() + estDaysRemaining);
+          estimatedDate = estDate.toISOString().split('T')[0];
+
+          daysDifference = daysRemaining - estDaysRemaining;
+
+          if (daysDifference > 3) {
+            forecastStatus = 'ahead';
+            forecastLabel = 'Ahead of Schedule';
+            forecastInsights = `At your current velocity (${weeklyRate} kg/week) with ${confidence} Confidence (${weightLogsCount} logs), you are projected to reach your goal on ${estDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}, which is ${Math.round(daysDifference)} days ahead of schedule!`;
+            onTrack = true;
+          } else if (daysDifference < -3) {
+            forecastStatus = 'behind';
+            forecastLabel = 'Behind Schedule';
+            const extra = Math.round(Math.abs(daysDifference));
+            forecastInsights = `At your current velocity (${weeklyRate} kg/week) with ${confidence} Confidence (${weightLogsCount} logs), you are projected to reach your goal on ${estDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}, which is ${extra} days behind schedule. Adjust caloric/activity thresholds to regain momentum.`;
+            onTrack = false;
+          } else {
+            forecastStatus = 'ontrack';
+            forecastLabel = 'On Track';
+            forecastInsights = `At your current velocity (${weeklyRate} kg/week) with ${confidence} Confidence (${weightLogsCount} logs), you are projected to reach your goal on ${estDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}, perfectly matching your target schedule!`;
+            onTrack = true;
+          }
+        } else {
+          forecastStatus = 'behind';
+          forecastLabel = 'Behind Schedule';
+          estimatedDate = 'Infinite';
+          onTrack = false;
+          forecastInsights = `Your weight trend is moving away from your goal parameters (current rate: ${weeklyRate} kg/week). Adjust daily consistency to return to path.`;
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      activeGoal,
+      currentWeight,
+      progressPct,
+      timeline: {
+        totalDays,
+        daysElapsed,
+        daysRemaining,
+        timePct
+      },
+      velocity: {
+        weeklyRate,
+        requiredRate,
+        onTrack
+      },
+      forecast: {
+        status: forecastStatus,
+        statusLabel: forecastLabel,
+        estimatedDate,
+        daysDifference,
+        confidence,
+        insights: forecastInsights
+      },
+      weightHistory
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.json({ success: false, message: 'Server error. Please try again.' });
+  }
+});
+
 // ─── Serve SPA ────────────────────────────────────────────────────
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

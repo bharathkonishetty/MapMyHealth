@@ -82,6 +82,7 @@
       <button class="nav-tab active" onclick="switchSection('workouts', this)">WORKOUTS</button>
       <button class="nav-tab"        onclick="switchSection('goals', this)">GOALS</button>
       <button class="nav-tab"        onclick="switchSection('journey', this)">JOURNEY MAP</button>
+      <button class="nav-tab"        onclick="switchSection('analytics', this)">ANALYTICS</button>
       <button class="nav-tab"        onclick="switchSection('diet', this)">DIET</button>
       <button class="nav-tab"        onclick="switchSection('about', this)">ABOUT</button>
       <button class="nav-tab"        onclick="switchSection('help', this)">HELP</button>
@@ -497,6 +498,21 @@
         </div>
       </div>
     </div><!-- /journey -->
+
+
+    <!-- ─── ANALYTICS SECTION ─────────────────────────────────────── -->
+    <div id="analytics" class="section-content">
+      <div class="journey-section-inner">
+        <div class="journey-header">
+          <h2>Progress Analytics</h2>
+          <div id="analytics-status-badge-container"></div>
+        </div>
+
+        <div id="analytics-main-area">
+          <!-- Dynamic Analytics Grid will be injected here -->
+        </div>
+      </div>
+    </div><!-- /analytics -->
 
 
   </div><!-- /dashboard -->

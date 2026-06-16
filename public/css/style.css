@@ -1322,4 +1322,172 @@ input::placeholder { color: rgba(255,255,255,0.5); }
     grid-template-columns: 1fr;
     gap: 24px;
   }
+}
+
+/* ─── Analytics Dashboard Styles (Phase 4) ───────────────────────── */
+.analytics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 24px;
+  margin-top: 10px;
+}
+
+.analytics-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  padding: 24px;
+  backdrop-filter: blur(10px);
+  position: relative;
+}
+
+.analytics-card h3 {
+  margin: 0 0 16px;
+  font-size: 1.1rem;
+  color: var(--warning-gold);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding-bottom: 8px;
+  font-weight: 700;
+}
+
+/* Status Badges */
+.badge-status-ahead {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: var(--accent-green);
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-status-ontrack {
+  background: rgba(20, 184, 166, 0.12);
+  border: 1px solid rgba(20, 184, 166, 0.35);
+  color: var(--primary-teal);
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-status-behind {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: var(--warning-gold);
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-status-insufficient {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255,255,255,0.5);
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metrics-panel-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chart-canvas-container {
+  height: 200px;
+  position: relative;
+  width: 100%;
+}
+
+.chart-point-marker {
+  transition: r 0.2s, stroke-width 0.2s, fill 0.2s;
+}
+
+.chart-point-group:hover .chart-point-marker {
+  r: 7px;
+  stroke-width: 3px;
+  fill: var(--accent-green);
+}
+
+.chart-tooltip {
+  position: absolute;
+  background: #020617;
+  border: 1px solid var(--primary-teal);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: white;
+  font-size: 11px;
+  pointer-events: none;
+  display: none;
+  z-index: 100;
+  transform: translate(-50%, -120%);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+.insight-stat-row {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  padding: 10px 0;
+}
+
+.insight-stat-row span {
+  font-size: 13px;
+}
+
+.insight-stat-row span.label {
+  color: rgba(255,255,255,0.55);
+}
+
+.insight-stat-row span.val {
+  font-weight: 700;
+  color: white;
+}
+
+.insight-stat-row span.val.highlight {
+  color: var(--primary-teal);
+}
+
+.analytics-progress-wrapper {
+  margin-top: 14px;
+}
+
+.analytics-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  margin-bottom: 6px;
+}
+
+.analytics-progress-bg {
+  height: 6px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.analytics-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-teal), var(--accent-green));
+  transition: width 0.8s ease-in-out;
+}
+
+@media (max-width: 850px) {
+  .analytics-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
 }
