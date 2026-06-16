@@ -1724,4 +1724,127 @@ input::placeholder { color: rgba(255,255,255,0.5); }
   border: 1px solid rgba(16, 185, 129, 0.25);
 }
 
+/* ─── AI Coach Tab Styles (Phase 8) ─────────────────────────────── */
+.coach-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 24px;
+  margin-top: 15px;
+}
+
+@media (max-width: 768px) {
+  .coach-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.coach-card {
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.coach-motivation-box {
+  background: rgba(20, 184, 166, 0.05);
+  border-left: 4px solid var(--primary-teal);
+  padding: 12px 16px;
+  border-radius: 4px 12px 12px 4px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 15px;
+  font-style: italic;
+}
+
+.ask-coach-box {
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.coach-question-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.2s, background-color 0.2s, border-color 0.2s;
+}
+
+.coach-question-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.coach-answer-container {
+  margin-top: 15px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  line-height: 1.6;
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.coach-answer-container h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #fff;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.coach-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.coach-summary-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.coach-summary-item i {
+  margin-top: 3px;
+  font-size: 13px;
+  width: 14px;
+  text-align: center;
+}
+
+.coach-summary-item.win i {
+  color: var(--accent-green);
+}
+
+.coach-summary-item.risk i {
+  color: #ef4444;
+}
+
+.coach-summary-item.focus i {
+  color: var(--warning-gold);
+}
+
 
