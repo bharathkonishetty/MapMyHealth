@@ -1,6 +1,6 @@
 # MapMyHealth
 
-A full-stack health tracking and analytics platform that helps users set health goals, track daily progress, analyze trends, receive personalized recommendations, and gain insights through an AI-powered coaching system.
+A fullstack health tracking and analytics platform that helps users set health goals, track daily progress, analyze trends, receive personalized recommendations, and gain insights through an AI powered coaching system.
 
 ---
 
