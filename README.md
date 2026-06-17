@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="screenshots/banner.png" alt="MapMyHealth Banner">
+  <img src="screenshots/banner.png" alt="MapMyHealth Banner" width="900">
 </p>
 
 <h1 align="center">🏥 MapMyHealth</h1>
@@ -7,12 +7,6 @@
 <p align="center">
 Full-Stack Health Tracking & Analytics Platform
 </p>
-
-# MapMyHealth
-
-A fullstack health tracking and analytics platform that helps users set health goals, track daily progress, analyze trends, receive personalized recommendations, and gain insights through an AI powered coaching system.
-
----
 
 # Features
 
