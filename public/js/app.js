@@ -114,6 +114,7 @@ function showDashboard(user) {
   loadHealthScore();
   loadRecommendations();
   loadCoach();
+  loadDashboardHome();
 }
  
 // ─── Save Profile Stats ───────────────────────────────────────────
@@ -132,6 +133,7 @@ async function saveProfile() {
     loadHealthScore();
     loadRecommendations();
     loadCoach();
+    loadDashboardHome();
   }
 }
  
@@ -161,12 +163,39 @@ document.addEventListener('click', (e) => {
  
 // ─── Navigation Tabs ─────────────────────────────────────────────
 function switchSection(sectionId, btn) {
+  // Dismiss profile modal if visible
+  const m = document.getElementById('profile-modal');
+  if (m) m.style.display = 'none';
+
   document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
-  document.getElementById(sectionId).classList.add('active');
-  if (btn) btn.classList.add('active');
+  document.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('active'));
 
-  if (sectionId === 'journey') {
+  const sectionEl = document.getElementById(sectionId);
+  if (sectionEl) sectionEl.classList.add('active');
+
+  if (btn) {
+    btn.classList.add('active');
+    if (btn.classList.contains('dropdown-item')) {
+      const trigger = document.querySelector('.dropdown-trigger');
+      if (trigger) trigger.classList.add('active');
+    }
+  } else {
+    // If switched programmatically, try to find and highlight the button
+    const matchingBtn = document.querySelector(`.nav-tab[onclick*="'${sectionId}'"]`) || 
+                        document.querySelector(`.dropdown-item[onclick*="'${sectionId}'"]`);
+    if (matchingBtn) {
+      matchingBtn.classList.add('active');
+      if (matchingBtn.classList.contains('dropdown-item')) {
+        const trigger = document.querySelector('.dropdown-trigger');
+        if (trigger) trigger.classList.add('active');
+      }
+    }
+  }
+
+  if (sectionId === 'dashboard-home') {
+    loadDashboardHome();
+  } else if (sectionId === 'journey') {
     loadJourney();
   } else if (sectionId === 'analytics') {
     loadAnalytics();
@@ -572,6 +601,7 @@ async function submitGoal() {
     loadHealthScore();
     loadRecommendations();
     loadCoach();
+    loadDashboardHome();
     showToast(editId ? '✓ Goal updated.' : '✓ Goal created! Your journey has begun.');
   } else {
     msg.textContent = result.message;
@@ -598,6 +628,7 @@ async function updateGoalStatus(goalId, status) {
     loadHealthScore();
     loadRecommendations();
     loadCoach();
+    loadDashboardHome();
     showToast(status === 'completed' ? '🎉 Goal completed! Well done.' : 'Goal cancelled.');
   } else {
     showToast('Error: ' + result.message);
@@ -1534,6 +1565,7 @@ async function saveCheckin(e) {
       loadHealthScore();
       loadRecommendations();
       loadCoach();
+      loadDashboardHome();
     } else {
       if (msg) {
         msg.textContent = result.message || 'Validation error.';
@@ -1603,7 +1635,6 @@ function renderHealthScoreView(data) {
   }
 
   // Calculate SVG circular parameters
-  // Circle radius r = 70, stroke-width = 12. Circumference = 2 * PI * r = 2 * 3.14159 * 70 = 439.8
   const radius = 70;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (score / 100) * circumference;
@@ -1650,7 +1681,7 @@ function renderHealthScoreView(data) {
           ` : `
             <div style="text-align: center; padding: 20px; opacity: 0.5;">
               <i class="fas fa-crown" style="font-size: 32px; color: var(--warning-gold); margin-bottom: 8px;"></i>
-              <p style="font-size: 13px; margin: 0; font-weight: 600; color: var(--primary-teal);">Excellent progress! You have locked in all target points today.</p>
+              <p style="font-size: 13px; margin: 0; font-weight: 600; color: var(--success);">Excellent progress! You have locked in all target points today.</p>
             </div>
           `}
         </div>
@@ -1664,41 +1695,47 @@ function renderHealthScoreView(data) {
           <div class="metrics-panel-stack" style="gap: 16px;">
             ${Object.entries(breakdown).map(([key, item]) => {
               const compTitles = {
-                goalProgress: { title: 'Goal Progress', icon: 'fa-bullseye', colorClass: 'excellent' },
-                dailyActivity: { title: 'Daily Activity', icon: 'fa-person-running', colorClass: 'excellent' },
-                workoutConsistency: { title: 'Workout Consistency', icon: 'fa-calendar-check', colorClass: 'excellent' },
-                hydration: { title: 'Daily Hydration', icon: 'fa-droplet', colorClass: 'excellent' },
-                energyLevels: { title: 'Energy Levels', icon: 'fa-bolt', colorClass: 'excellent' },
-                checkinStreaks: { title: 'Check-In Streaks', icon: 'fa-fire', colorClass: 'excellent' }
-              }[key] || { title: key, icon: 'fa-question', colorClass: 'excellent' };
+                goalProgress: { title: 'Goal Progress', icon: 'fa-bullseye' },
+                dailyActivity: { title: 'Daily Activity', icon: 'fa-running' },
+                workoutConsistency: { title: 'Workout Consistency', icon: 'fa-calendar-check' },
+                hydration: { title: 'Daily Hydration', icon: 'fa-tint' },
+                energyLevels: { title: 'Energy Levels', icon: 'fa-bolt' },
+                checkinStreaks: { title: 'Check-In Streaks', icon: 'fa-fire' }
+              }[key] || { title: key, icon: 'fa-question' };
 
               const scoreVal = item.score;
+              const statusColor = scoreVal >= 80 ? 'var(--success)' : (scoreVal >= 60 ? 'var(--warning)' : 'var(--danger)');
 
               return `
-                <div class="analytics-card healthscore-breakdown-card" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 16px; border-radius: 16px;">
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-                    <span style="font-size:14px; font-weight:700; display:flex; align-items:center; gap: 8px;">
-                      <i class="fas ${compTitles.icon}" style="color:var(--primary-teal); width: 16px; text-align: center;"></i>
-                      ${compTitles.title}
+                <details class="score-breakdown-details">
+                  <summary class="breakdown-summary">
+                    <span class="breakdown-summary-left">
+                      <i class="fas ${compTitles.icon}"></i>
+                      <span>${compTitles.title}</span>
                     </span>
-                    <span style="font-size: 14px; font-weight: 800; color: ${scoreVal >= 80 ? 'var(--primary-teal)' : (scoreVal >= 60 ? 'var(--warning-gold)' : 'var(--danger-red)')};">
-                      ${scoreVal}/100
+                    <span class="breakdown-summary-right">
+                      <span class="score-val" style="color: ${statusColor};">
+                        ${scoreVal}/100
+                      </span>
+                      <i class="fas fa-chevron-down arrow-icon"></i>
                     </span>
-                  </div>
+                  </summary>
                   
-                  <div style="font-size: 11.5px; color: rgba(255,255,255,0.45); display: flex; justify-content: space-between; margin-bottom: 6px;">
-                    <span>Metric: ${escapeHtml(item.value)}</span>
-                    <span>Target: ${escapeHtml(item.target)}</span>
-                  </div>
-                  
-                  <div class="analytics-progress-bg" style="height: 4px; margin-bottom: 10px;">
-                    <div class="analytics-progress-fill" style="width: ${scoreVal}%; background: ${scoreVal >= 80 ? 'var(--primary-teal)' : (scoreVal >= 60 ? 'var(--warning-gold)' : 'var(--danger-red)')};"></div>
-                  </div>
+                  <div class="breakdown-details-content" style="padding-top: 16px;">
+                    <div style="font-size: 11.5px; color: var(--text-secondary); display: flex; justify-content: space-between; margin-bottom: 8px;">
+                      <span>Metric: <strong>${escapeHtml(item.value)}</strong></span>
+                      <span>Target: <strong>${escapeHtml(item.target)}</strong></span>
+                    </div>
+                    
+                    <div class="analytics-progress-bg" style="height: 6px; margin-bottom: 12px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+                      <div class="analytics-progress-fill" style="height: 100%; width: ${scoreVal}%; background: ${statusColor}; border-radius: 3px;"></div>
+                    </div>
 
-                  <p style="margin: 0; font-size: 12.5px; line-height: 1.4; color: rgba(255,255,255,0.7); font-style: italic;">
-                    ${escapeHtml(item.explanation)}
-                  </p>
-                </div>
+                    <p style="margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-secondary); font-style: italic;">
+                      ${escapeHtml(item.explanation)}
+                    </p>
+                  </div>
+                </details>
               `;
             }).join('')}
           </div>
@@ -1952,11 +1989,9 @@ function renderRecommendationsView(data) {
   const score = data.healthScore;
   const list = data.recommendations || [];
   
-  // Calculate counts
   const totalCount = list.length;
   const highCount = list.filter(r => r.priority === 'high').length;
 
-  // Render header summary badges
   let scoreClass = 'needs-attention';
   if (score >= 90) scoreClass = 'elite';
   else if (score >= 80) scoreClass = 'excellent';
@@ -1999,31 +2034,457 @@ function renderRecommendationsView(data) {
   };
 
   container.innerHTML = `
-    <div class="recommendations-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; margin-top: 10px;">
+    <div class="recommendations-grid">
       ${list.map(rec => {
         const catLabel = categoryLabels[rec.category] || rec.category;
         const prioLabel = priorityLabels[rec.priority] || rec.priority;
+        const iconClass = getCategoryIcon(rec.category);
+        const scoreImpact = getHealthScoreImpact(rec.category, rec.priority);
         return `
-          <div class="recommendation-card priority-${rec.priority}" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s, background-color 0.2s;">
+          <div class="glass-card recommendation-card priority-${rec.priority}">
             <div>
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <span class="prio-badge badge-${rec.priority}" style="font-size: 10.5px; font-weight: 800; padding: 2px 8px; border-radius: 6px; letter-spacing: 0.5px;">${prioLabel}</span>
-                <span style="font-size: 11.5px; color: rgba(255,255,255,0.4); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">${catLabel}</span>
+              <div class="rec-card-header">
+                <span class="prio-badge badge-${rec.priority}">${prioLabel}</span>
+                <span class="rec-category"><i class="fas ${iconClass}"></i> ${catLabel}</span>
               </div>
-              <h3 style="margin: 0 0 8px 0; font-size: 15.5px; font-weight: 600; color: #fff;">${escapeHtml(rec.title)}</h3>
-              <p style="margin: 0 0 16px 0; font-size: 13px; line-height: 1.45; color: rgba(255,255,255,0.7); font-style: italic;">
-                ${escapeHtml(rec.description)}
-              </p>
+              <h3 class="rec-title">${escapeHtml(rec.title)}</h3>
+              <p class="rec-desc">${escapeHtml(rec.description)}</p>
             </div>
-            <div style="background: rgba(255,255,255,0.02); border-top: 1px solid rgba(255,255,255,0.04); padding: 10px 12px; margin: 4px -18px -18px -18px; border-radius: 0 0 16px 16px;">
-              <span style="display: block; font-size: 10.5px; font-weight: 700; color: rgba(255,255,255,0.4); text-transform: uppercase; margin-bottom: 2px; letter-spacing: 0.3px;">Expected Benefit</span>
-              <span style="font-size: 11.5px; color: rgba(255,255,255,0.8); line-height: 1.35;">${escapeHtml(rec.expectedBenefit)}</span>
+            <div class="rec-card-footer">
+              <div class="rec-footer-item">
+                <span class="footer-label">Expected Benefit</span>
+                <span class="footer-value">${escapeHtml(rec.expectedBenefit)}</span>
+              </div>
+              <div class="rec-footer-item">
+                <span class="footer-label">Score Impact</span>
+                <span class="footer-value highlight">${scoreImpact}</span>
+              </div>
             </div>
           </div>
         `;
       }).join('')}
     </div>
   `;
+}
+
+// Helper to determine calculated impact
+function getHealthScoreImpact(category, priority) {
+  const impacts = {
+    goal_progress: { high: '+15.0 to +25.0 pts', medium: '+5.0 to +15.0 pts', low: 'Optimized' },
+    activity: { high: '+10.0 to +20.0 pts', medium: '+4.0 to +10.0 pts', low: 'Optimized' },
+    consistency: { high: '+10.0 to +20.0 pts', medium: '+4.0 to +10.0 pts', low: 'Optimized' },
+    hydration: { high: '+7.5 to +15.0 pts', medium: '+2.5 to +7.5 pts', low: 'Optimized' },
+    recovery: { high: '+2.5 to +5.0 pts', medium: '+1.0 to +2.5 pts', low: 'Optimized' }
+  };
+  return impacts[category]?.[priority] || '+0 pts';
+}
+
+// Helper to resolve Font Awesome icons
+function getCategoryIcon(category) {
+  const icons = {
+    goal_progress: 'fa-bullseye',
+    activity: 'fa-running',
+    hydration: 'fa-tint',
+    recovery: 'fa-bed',
+    consistency: 'fa-calendar-check'
+  };
+  return icons[category] || 'fa-lightbulb';
+}
+
+// ─── Dashboard Home: Load Data (Phase 9) ──────────────────────────────
+async function loadDashboardHome() {
+  const container = document.getElementById('dashboard-main-area');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="loading-container" style="padding: 40px; text-align: center;">
+      <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: rgba(255,255,255,0.4);"></i>
+      <p style="margin-top: 10px; color: rgba(255,255,255,0.4); font-size: 13px;">Assembling your dashboard statistics...</p>
+    </div>
+  `;
+
+  // Set the dashboard date
+  const dateBadge = document.getElementById('dashboard-date');
+  if (dateBadge) {
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    dateBadge.textContent = new Date().toLocaleDateString('en-US', options);
+  }
+
+  try {
+    const [scoreData, recData, coachData, checkinToday] = await Promise.all([
+      fetch('/api/healthscore').then(r => r.json()),
+      fetch('/api/recommendations').then(r => r.json()),
+      fetch('/api/coach').then(r => r.json()),
+      fetch('/api/checkin/today').then(r => r.json())
+    ]);
+
+    if (!scoreData.success || !recData.success || !coachData.success || !checkinToday.success) {
+      container.innerHTML = `<p class="msg error" style="margin: 20px;">Error loading dashboard data. Please try again.</p>`;
+      return;
+    }
+
+    const score = scoreData.healthScore;
+    const rating = scoreData.rating;
+    const recCount = recData.recommendations ? recData.recommendations.length : 0;
+
+    // Get active goal progress
+    let progressText = 'No Active Goal';
+    let progressPct = 0;
+    
+    const goalComp = scoreData.breakdown ? scoreData.breakdown.goalProgress : null;
+    if (goalComp) {
+      progressText = goalComp.value || 'No Active Goal';
+      progressPct = goalComp.score || 0;
+    }
+
+    // Set Welcome Header with user name and dynamic greeting
+    const welcomeTitle = document.getElementById('welcome-title');
+    const welcomeSubtitle = document.getElementById('welcome-subtitle');
+    if (welcomeTitle) {
+      const username = (document.getElementById('p-name') && document.getElementById('p-name').textContent.trim()) || 'User';
+      const hours = new Date().getHours();
+      let greeting = 'Good evening';
+      if (hours >= 5 && hours < 12) {
+        greeting = 'Good morning';
+      } else if (hours >= 12 && hours < 17) {
+        greeting = 'Good afternoon';
+      }
+      welcomeTitle.textContent = `${greeting}, ${username}!`;
+    }
+    if (welcomeSubtitle) {
+      const options = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' };
+      const formattedDate = new Date().toLocaleDateString('en-US', options);
+      welcomeSubtitle.textContent = `Today is ${formattedDate}. Here is your health overview.`;
+    }
+
+    // Rating Color classes
+    const ratingClass = rating.toLowerCase().replace(' ', '-');
+
+    // Resolve current check-in streak
+    let streakText = '0 Days';
+    const streakComp = scoreData.breakdown ? scoreData.breakdown.checkinStreaks : null;
+    if (streakComp && streakComp.value) {
+      streakText = streakComp.value;
+    }
+
+    // Resolve today's checkin metrics
+    let stepsDisplay = 'Not logged';
+    let hydrationDisplay = 'Not logged';
+    let workoutDisplay = 'Not logged';
+    let energyDisplay = 'Not logged';
+
+    if (checkinToday.logged && checkinToday.data) {
+      const data = checkinToday.data;
+      if (data.steps_count !== null) {
+        stepsDisplay = `${data.steps_count.toLocaleString()} steps`;
+      } else {
+        stepsDisplay = '0 steps';
+      }
+
+      if (data.water_intake_l !== null) {
+        hydrationDisplay = `${data.water_intake_l.toFixed(1)} L`;
+      } else {
+        hydrationDisplay = '0.0 L';
+      }
+
+      if (data.workout_completed) {
+        workoutDisplay = `Completed (${data.workout_duration_mins || 0}m)`;
+      } else {
+        workoutDisplay = 'Rest day';
+      }
+
+      if (data.energy_level !== null) {
+        energyDisplay = `${data.energy_level} / 10`;
+      } else {
+        energyDisplay = '5 / 10';
+      }
+    }
+
+    // Resolve AI Coach Mood
+    let moodText = 'Stable';
+    let moodColorBg = 'rgba(59, 130, 246, 0.1)';
+    let moodColorText = 'var(--primary)';
+    let moodBorderColor = 'rgba(59, 130, 246, 0.2)';
+
+    if (score >= 90) {
+      moodText = 'Peak Performance 🌟';
+      moodColorBg = 'rgba(34, 197, 94, 0.15)';
+      moodColorText = 'var(--success)';
+      moodBorderColor = 'rgba(34, 197, 94, 0.3)';
+    } else if (score >= 80) {
+      moodText = 'Solid Progress 👍';
+      moodColorBg = 'rgba(59, 130, 246, 0.15)';
+      moodColorText = 'var(--primary)';
+      moodBorderColor = 'rgba(59, 130, 246, 0.3)';
+    } else if (score >= 70) {
+      moodText = 'Healthy & Stable ⚖️';
+      moodColorBg = 'rgba(59, 130, 246, 0.1)';
+      moodColorText = 'rgba(255, 255, 255, 0.8)';
+      moodBorderColor = 'rgba(255, 255, 255, 0.15)';
+    } else if (score >= 60) {
+      moodText = 'Average Pace ⚠️';
+      moodColorBg = 'rgba(245, 158, 11, 0.15)';
+      moodColorText = 'var(--warning)';
+      moodBorderColor = 'rgba(245, 158, 11, 0.3)';
+    } else {
+      moodText = 'Action Required 🚨';
+      moodColorBg = 'rgba(239, 68, 68, 0.15)';
+      moodColorText = 'var(--danger)';
+      moodBorderColor = 'rgba(239, 68, 68, 0.3)';
+    }
+
+    // Resolve Priority Focus recommendation
+    let priorityFocusHtml = '';
+    const recs = recData.recommendations || [];
+    if (recs.length > 0) {
+      const prioOrder = { high: 1, medium: 2, low: 3 };
+      const sortedRecs = [...recs].sort((a, b) => {
+        const pA = prioOrder[a.priority] || 4;
+        const pB = prioOrder[b.priority] || 4;
+        return pA - pB;
+      });
+      const topRec = sortedRecs[0];
+      
+      const prioLabels = { high: 'HIGH', medium: 'MEDIUM', low: 'LOW' };
+      const categoryLabels = {
+        goal_progress: 'Goal Progress',
+        activity: 'Activity',
+        hydration: 'Hydration',
+        recovery: 'Recovery',
+        consistency: 'Consistency'
+      };
+      
+      const categoryIcons = {
+        goal_progress: 'fa-bullseye',
+        activity: 'fa-running',
+        hydration: 'fa-tint',
+        recovery: 'fa-bed',
+        consistency: 'fa-calendar-check'
+      };
+
+      const topPrio = topRec.priority || 'low';
+      const topPrioLabel = prioLabels[topPrio] || topPrio.toUpperCase();
+      const topCatLabel = categoryLabels[topRec.category] || topRec.category;
+      const topIcon = categoryIcons[topRec.category] || 'fa-lightbulb';
+      const topBenefit = topRec.expectedBenefit || 'N/A';
+      const topImpact = getHealthScoreImpact(topRec.category, topRec.priority);
+
+      let prioBg = 'rgba(245, 158, 11, 0.15)';
+      let prioText = 'var(--warning)';
+      let prioBorder = 'rgba(245, 158, 11, 0.3)';
+      if (topPrio === 'high') {
+        prioBg = 'rgba(239, 68, 68, 0.15)';
+        prioText = 'var(--danger)';
+        prioBorder = 'rgba(239, 68, 68, 0.3)';
+      } else if (topPrio === 'low') {
+        prioBg = 'rgba(59, 130, 246, 0.15)';
+        prioText = 'var(--primary)';
+        prioBorder = 'rgba(59, 130, 246, 0.3)';
+      }
+
+      priorityFocusHtml = `
+        <div class="glass-card" style="padding: 24px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px;">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
+                <i class="fas ${topIcon}" style="color: var(--primary);"></i> Priority Focus Area
+              </h3>
+              <span style="font-size: 10px; font-weight: 800; background: ${prioBg}; color: ${prioText}; padding: 4px 8px; border-radius: 4px; border: 1px solid ${prioBorder}; text-transform: uppercase;">
+                ${topPrioLabel}
+              </span>
+            </div>
+            <div style="font-size: 11px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px;">
+              Category: ${topCatLabel}
+            </div>
+            <h4 style="margin: 0 0 8px 0; font-size: 15px; font-weight: 700; color: #fff; line-height: 1.3;">
+              ${escapeHtml(topRec.title)}
+            </h4>
+            <p style="margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-secondary);">
+              ${escapeHtml(topRec.description)}
+            </p>
+          </div>
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+            <div>
+              <div style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 2px;">Expected Benefit</div>
+              <div style="font-size: 12px; font-weight: 600; color: #fff;">${escapeHtml(topBenefit)}</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 2px;">Score Impact</div>
+              <div style="font-size: 12px; font-weight: 600; color: var(--primary);">${topImpact}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      priorityFocusHtml = `
+        <div class="glass-card" style="padding: 24px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 160px;">
+          <i class="fas fa-check-circle" style="font-size: 32px; color: var(--success); margin-bottom: 12px;"></i>
+          <h3 style="margin: 0 0 6px 0; font-size: 15px; font-weight: 700; color: #fff;">System Fully Optimized</h3>
+          <p style="margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-secondary);">
+            All check-ins, hydration, and goal progress are on track. No action items generated.
+          </p>
+        </div>
+      `;
+    }
+
+    container.innerHTML = `
+      <!-- Quick Stats Row -->
+      <div class="stats-row">
+        <div class="stats-card" onclick="switchSection('healthscore', document.querySelector('.nav-tab[onclick*=\\'healthscore\\']'))">
+          <div class="stats-header">
+            <span class="label">Health Score</span>
+            <i class="fas fa-heartbeat" style="color: var(--primary);"></i>
+          </div>
+          <div class="value">${score} <span class="unit">/ 100</span></div>
+          <div class="subtitle text-${ratingClass}">${rating} Status</div>
+        </div>
+
+        <div class="stats-card" onclick="switchSection('journey', document.querySelector('.nav-tab[onclick*=\\'journey\\']'))">
+          <div class="stats-header">
+            <span class="label">Goal Progress</span>
+            <i class="fas fa-bullseye" style="color: var(--success);"></i>
+          </div>
+          <div class="value">${progressPct}%</div>
+          <div class="subtitle">${escapeHtml(progressText)}</div>
+        </div>
+
+        <div class="stats-card" onclick="switchSection('recommendations', document.querySelector('.nav-tab[onclick*=\\'recommendations\\']'))">
+          <div class="stats-header">
+            <span class="label">Recommendations</span>
+            <i class="fas fa-lightbulb" style="color: var(--warning);"></i>
+          </div>
+          <div class="value">${recCount}</div>
+          <div class="subtitle">${recCount === 1 ? 'Action item' : 'Action items'} triggered</div>
+        </div>
+
+        <div class="stats-card" onclick="switchSection('checkin', document.querySelector('.nav-tab[onclick*=\\'checkin\\']'))">
+          <div class="stats-header">
+            <span class="label">Logging Streak</span>
+            <i class="fas fa-fire" style="color: var(--danger);"></i>
+          </div>
+          <div class="value">${escapeHtml(streakText)}</div>
+          <div class="subtitle">Log daily to protect streak</div>
+        </div>
+      </div>
+
+      <!-- Dashboard Split Layout -->
+      <div class="dashboard-grid">
+        <!-- Left Side: Today's Summary & Priority Focus -->
+        <div class="dashboard-left" style="display: flex; flex-direction: column; gap: var(--space-lg);">
+          
+          <!-- Today's Summary Card -->
+          <div class="glass-card" style="padding: 24px;">
+            <h3 style="margin-top:0; font-size: 15px; font-weight:700; color:#fff; display:flex; align-items:center; gap:8px;">
+              <i class="fas fa-calendar-day" style="color: var(--primary);"></i> Today's Summary
+            </h3>
+            <div class="today-summary-grid">
+              <div class="summary-metric-item">
+                <i class="fas fa-walking" style="color: var(--primary);"></i>
+                <div class="metric-info">
+                  <span class="metric-title">Steps</span>
+                  <span class="metric-value">${stepsDisplay}</span>
+                </div>
+              </div>
+              <div class="summary-metric-item">
+                <i class="fas fa-tint" style="color: var(--primary);"></i>
+                <div class="metric-info">
+                  <span class="metric-title">Hydration</span>
+                  <span class="metric-value">${hydrationDisplay}</span>
+                </div>
+              </div>
+              <div class="summary-metric-item">
+                <i class="fas fa-dumbbell" style="color: var(--primary);"></i>
+                <div class="metric-info">
+                  <span class="metric-title">Workout</span>
+                  <span class="metric-value">${workoutDisplay}</span>
+                </div>
+              </div>
+              <div class="summary-metric-item">
+                <i class="fas fa-bolt" style="color: var(--primary);"></i>
+                <div class="metric-info">
+                  <span class="metric-title">Energy Level</span>
+                  <span class="metric-value">${energyDisplay}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Priority Focus Card -->
+          ${priorityFocusHtml}
+
+        </div>
+
+        <!-- Right Side: AI Coach Mood & Summary Card -->
+        <div class="dashboard-right">
+          <div class="glass-card" style="padding: 24px; height: 100%; display: flex; flex-direction: column; justify-content: space-between; gap: 20px;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="margin:0; font-size: 15px; font-weight:700; color:#fff; display:flex; align-items:center; gap:8px;">
+                  <i class="fas fa-robot" style="color: var(--primary);"></i> AI Coach
+                </h3>
+                <span style="font-size: 11px; font-weight: 800; background: ${moodColorBg}; color: ${moodColorText}; padding: 4px 10px; border-radius: 20px; border: 1px solid ${moodBorderColor};">
+                  Mood: ${moodText}
+                </span>
+              </div>
+              
+              <p style="font-size: 13.5px; line-height:1.5; color: rgba(255,255,255,0.85); margin: 0 0 16px 0; font-style: italic;">
+                "${escapeHtml(coachData.dailySummary.summary)}"
+              </p>
+              
+              <div style="background: rgba(59, 130, 246, 0.05); border-left: 4px solid var(--primary); padding: 12px 14px; border-radius: 4px 12px 12px 4px; margin-bottom: 20px;">
+                <span style="display:block; font-size: 10px; font-weight:800; color:rgba(255,255,255,0.4); text-transform:uppercase; margin-bottom: 2px;">Today's Key Focus</span>
+                <span style="font-size: 13px; font-weight: 600; color: var(--warning-gold); line-height:1.4;">${escapeHtml(coachData.dailySummary.focus)}</span>
+              </div>
+            </div>
+
+            <div class="stats-split" style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 16px;">
+              <div>
+                <h4 style="margin:0 0 8px 0; font-size: 11px; font-weight:800; color:var(--success); text-transform:uppercase; letter-spacing:0.5px;">Weekly Wins</h4>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                  ${coachData.weeklySummary.wins && coachData.weeklySummary.wins.length > 0 ? 
+                    coachData.weeklySummary.wins.slice(0, 2).map(w => `
+                      <div style="font-size: 12px; color:rgba(255,255,255,0.75); display:flex; align-items:start; gap: 8px;">
+                        <i class="fas fa-check-circle" style="color:var(--success); margin-top:2px; font-size:11px;"></i>
+                        <span>${escapeHtml(w)}</span>
+                      </div>
+                    `).join('') : `
+                      <div style="font-size: 12px; color:rgba(255,255,255,0.45); font-style:italic;">No wins logged yet.</div>
+                    `
+                  }
+                </div>
+              </div>
+              <div>
+                <h4 style="margin:0 0 8px 0; font-size: 11px; font-weight:800; color:var(--danger); text-transform:uppercase; letter-spacing:0.5px;">Weekly Risks</h4>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                  ${coachData.weeklySummary.risks && coachData.weeklySummary.risks.length > 0 ? 
+                    coachData.weeklySummary.risks.slice(0, 2).map(r => `
+                      <div style="font-size: 12px; color:rgba(255,255,255,0.75); display:flex; align-items:start; gap: 8px;">
+                        <i class="fas fa-exclamation-triangle" style="color:var(--danger); margin-top:2px; font-size:11px;"></i>
+                        <span>${escapeHtml(r)}</span>
+                      </div>
+                    `).join('') : `
+                      <div style="font-size: 12px; color:rgba(255,255,255,0.45); font-style:italic;">No active risks.</div>
+                    `
+                  }
+                </div>
+              </div>
+            </div>
+            
+            <div style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 16px; text-align: center;">
+              <button class="btn-action" onclick="switchSection('coach', document.querySelector('.nav-tab[onclick*=\\'coach\\']'))" style="margin: 0 auto; display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px;">
+                <span>Ask Coach a Question</span>
+                <i class="fas fa-chevron-right" style="font-size: 10px;"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+  } catch (err) {
+    console.error(err);
+    container.innerHTML = `<p class="msg error" style="margin: 20px;">Failed to connect to stats server.</p>`;
+  }
 }
 
  
