@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BeginnerFit — MapMyHealth</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <link rel="stylesheet" href="/css/style.css">
 </head>
@@ -79,23 +82,48 @@
  
     <!-- Navigation Tabs -->
     <div class="nav-tabs">
-      <button class="nav-tab active" onclick="switchSection('workouts', this)">WORKOUTS</button>
-      <button class="nav-tab"        onclick="switchSection('healthscore', this)">HEALTH SCORE</button>
-      <button class="nav-tab"        onclick="switchSection('recommendations', this)">RECOMMENDATIONS</button>
-      <button class="nav-tab"        onclick="switchSection('coach', this)">AI COACH</button>
-      <button class="nav-tab"        onclick="switchSection('goals', this)">GOALS</button>
-      <button class="nav-tab"        onclick="switchSection('journey', this)">JOURNEY MAP</button>
-      <button class="nav-tab"        onclick="switchSection('analytics', this)">ANALYTICS</button>
-      <button class="nav-tab"        onclick="switchSection('checkin', this)">DAILY CHECK-IN</button>
-      <button class="nav-tab"        onclick="switchSection('diet', this)">DIET</button>
-      <button class="nav-tab"        onclick="switchSection('about', this)">ABOUT</button>
-      <button class="nav-tab"        onclick="switchSection('help', this)">HELP</button>
-      <button class="nav-tab"        onclick="switchSection('trainer', this)">TRAINER</button>
+      <button class="nav-tab active" onclick="switchSection('dashboard-home', this)"><i class="fas fa-chart-pie"></i> Dashboard</button>
+      <button class="nav-tab"        onclick="switchSection('journey', this)"><i class="fas fa-map-marked-alt"></i> Journey Map</button>
+      <button class="nav-tab"        onclick="switchSection('checkin', this)"><i class="fas fa-calendar-check"></i> Check-In</button>
+      <button class="nav-tab"        onclick="switchSection('workouts', this)"><i class="fas fa-dumbbell"></i> Workouts</button>
+      <button class="nav-tab"        onclick="switchSection('healthscore', this)"><i class="fas fa-heartbeat"></i> Health Score</button>
+      <button class="nav-tab"        onclick="switchSection('recommendations', this)"><i class="fas fa-lightbulb"></i> Recommendations</button>
+      <button class="nav-tab"        onclick="switchSection('coach', this)"><i class="fas fa-robot"></i> AI Coach</button>
+      
+      <div class="nav-dropdown">
+        <button class="nav-tab dropdown-trigger"><i class="fas fa-ellipsis-h"></i> More <i class="fas fa-chevron-down" style="font-size: 10px; margin-left: 4px;"></i></button>
+        <div class="dropdown-content">
+          <button class="dropdown-item" onclick="switchSection('goals', this)"><i class="fas fa-bullseye"></i> Goals</button>
+          <button class="dropdown-item" onclick="switchSection('analytics', this)"><i class="fas fa-chart-line"></i> Analytics</button>
+          <button class="dropdown-item" onclick="switchSection('diet', this)"><i class="fas fa-apple-alt"></i> Diet Plan</button>
+          <button class="dropdown-item" onclick="switchSection('trainer', this)"><i class="fas fa-user-friends"></i> Trainers</button>
+          <button class="dropdown-item" onclick="switchSection('about', this)"><i class="fas fa-info-circle"></i> About</button>
+          <button class="dropdown-item" onclick="switchSection('help', this)"><i class="fas fa-question-circle"></i> Help</button>
+        </div>
+      </div>
     </div>
  
  
+    <!-- ─── DASHBOARD HOME SECTION ───────────────────────── -->
+    <div id="dashboard-home" class="section-content active">
+      <div class="journey-section-inner">
+        <div class="journey-header">
+          <div class="hero-welcome">
+            <h1 id="welcome-title">Welcome back!</h1>
+            <p id="welcome-subtitle">Here is your health overview for today.</p>
+          </div>
+          <div class="date-badge" id="dashboard-date">Today</div>
+        </div>
+ 
+        <div id="dashboard-main-area">
+          <!-- Dynamic Dashboard Cards will be injected here -->
+        </div>
+      </div>
+    </div><!-- /dashboard-home -->
+ 
+ 
     <!-- ─── WORKOUTS SECTION ─────────────────────────────── -->
-    <div id="workouts" class="section-content active">
+    <div id="workouts" class="section-content">
       <div class="day-dropdown">
         <select onchange="selectDay(this.value)">
           <option value="">— Select Workout Day —</option>
