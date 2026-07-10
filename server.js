@@ -8,6 +8,12 @@ const db = require('./db/index');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ─── Environment Validation ───────────────────────────────────────
+if (!process.env.SESSION_SECRET) {
+  console.error('❌ SESSION_SECRET is required. Please configure it in your .env file.');
+  process.exit(1);
+}
+
 // ─── PostgreSQL Connection ────────────────────────────────────────
 const pool = db.pool;
 
@@ -30,7 +36,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
-  secret: process.env.SESSION_SECRET || '***REMOVED***',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 }
