@@ -1,7 +1,7 @@
 {
-  "name": "beginner-fit",
+  "name": "mapmyhealth",
   "version": "1.0.0",
-  "description": "BeginnerFit - MapMyHealth Fitness App",
+  "description": "MapMyHealth - Personalized Health and Fitness Tracking Platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

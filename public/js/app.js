@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   BeginnerFit - Frontend App Logic
+   MapMyHealth - Frontend App Logic
    Communicates with Node.js backend via fetch() API calls
 ═══════════════════════════════════════════════════════════ */
  

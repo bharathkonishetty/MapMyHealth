@@ -2462,6 +2462,6 @@ app.get('*', (req, res) => {
 
 // ─── Start Server ─────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`\n✅ BeginnerFit server running at http://localhost:${PORT}`);
+  console.log(`\n✅ MapMyHealth server running at http://localhost:${PORT}`);
   console.log(`✅ Connected to PostgreSQL database: mapmyhealth\n`);
 });
