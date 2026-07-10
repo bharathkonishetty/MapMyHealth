@@ -4,6 +4,7 @@ const { Client } = require('pg');
 require('./env')();
 
 async function runMigration() {
+  let isConnected = false;
   const client = new Client({
     user: process.env.DB_USER || 'postgres',
     host: process.env.DB_HOST || 'localhost',
@@ -14,7 +15,10 @@ async function runMigration() {
 
   try {
     await client.connect();
+    isConnected = true;
     console.log('Connected to PostgreSQL database for migration.');
+
+    await client.query('BEGIN');
 
     // 1. Check if the old users table exists and identify schema
     const checkTableQuery = `
@@ -56,6 +60,7 @@ async function runMigration() {
 
     // 4. Migrate data from users_old if it exists
     if (usersTableExists && hasOldSchema) {
+
       console.log('Migrating rows from users_old to normalized tables...');
       const oldUsersRes = await client.query('SELECT * FROM users_old;');
       
@@ -153,14 +158,25 @@ async function runMigration() {
         console.log('No database migration or seeding required.');
       }
     }
-
+    await client.query('COMMIT');
     console.log('Migration execution completed successfully.');
 
   } catch (err) {
+    if (isConnected) {
+      try {
+        await client.query('ROLLBACK');
+        console.error('Migration rolled back due to an error.');
+      } catch (rollbackErr) {
+        console.error('Rollback failed:', rollbackErr);
+      }
+    }
+
     console.error('Migration failed:', err);
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
-    await client.end();
+    if (isConnected) {
+      await client.end();
+    }
   }
 }
 
