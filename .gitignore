@@ -1,3 +1,18 @@
 node_modules/
 .env
 users_old.sql
+# Local user data - contains sensitive information
+data/user.json
+data/users.json
+
+# Database backups
+*.sql
+*.dump
+*.backup
+
+# macOS system files
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
