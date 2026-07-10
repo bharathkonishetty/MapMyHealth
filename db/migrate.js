@@ -8,7 +8,7 @@ async function runMigration() {
     user: process.env.DB_USER || 'postgres',
     host: process.env.DB_HOST || 'localhost',
     database: process.env.DB_DATABASE || 'mapmyhealth',
-    password: process.env.DB_PASSWORD || '***REMOVED***',
+    password: process.env.DB_PASSWORD,
     port: parseInt(process.env.DB_PORT || '5432', 10),
   });
 
