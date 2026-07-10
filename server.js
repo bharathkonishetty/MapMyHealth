@@ -17,19 +17,6 @@ if (!process.env.SESSION_SECRET) {
 // ─── PostgreSQL Connection ────────────────────────────────────────
 const pool = db.pool;
 
-// ─── Database Migration: Daily Check-In (Phase 5) ──────────────────
-(async () => {
-  try {
-    await pool.query(`
-      ALTER TABLE progress_logs 
-      ADD COLUMN IF NOT EXISTS energy_level INTEGER CHECK (energy_level >= 1 AND energy_level <= 5)
-    `);
-    console.log('✅ Daily Check-in database migrations completed.');
-  } catch (err) {
-    console.error('❌ Daily Check-in database migration error:', err);
-  }
-})();
-
 // ─── Middleware ───────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

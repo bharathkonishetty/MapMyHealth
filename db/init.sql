@@ -56,10 +56,16 @@ CREATE TABLE IF NOT EXISTS progress_logs (
     workout_completed BOOLEAN DEFAULT FALSE,
     workout_duration_mins INTEGER DEFAULT 0 CHECK (workout_duration_mins >= 0),
     steps_count INTEGER DEFAULT 0 CHECK (steps_count >= 0),
+    energy_level INTEGER CHECK (energy_level >= 1 AND energy_level <= 5),
     notes TEXT,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT unique_user_daily_log UNIQUE (user_id, log_date)
 );
+
+-- Ensure existing databases receive the Daily Check-In energy level column
+ALTER TABLE progress_logs
+ADD COLUMN IF NOT EXISTS energy_level INTEGER
+CHECK (energy_level >= 1 AND energy_level <= 5);
 
 -- 5. HEALTH SCORES Table (Historical Score records)
 CREATE TABLE IF NOT EXISTS health_scores (
@@ -75,6 +81,10 @@ CREATE TABLE IF NOT EXISTS health_scores (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT unique_user_daily_score UNIQUE (user_id, log_date)
 );
+-- Ensure existing databases receive the Daily Check-In energy level column
+ALTER TABLE progress_logs
+ADD COLUMN IF NOT EXISTS energy_level INTEGER
+CHECK (energy_level >= 1 AND energy_level <= 5);
 
 -- 6. JOURNEY CHECKPOINTS Table (Visual Journey landmarks)
 CREATE TABLE IF NOT EXISTS journey_checkpoints (
