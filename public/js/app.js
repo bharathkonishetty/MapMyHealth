@@ -2,7 +2,7 @@
    BeginnerFit - Frontend App Logic
    Communicates with Node.js backend via fetch() API calls
 ═══════════════════════════════════════════════════════════ */
- 
+
 // ─── Toast Notification ───────────────────────────────────────────
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -10,7 +10,7 @@ function showToast(msg) {
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3000);
 }
- 
+
 // ─── API Helpers ──────────────────────────────────────────────────
 async function apiPost(endpoint, data) {
   const res = await fetch(endpoint, {
@@ -20,12 +20,12 @@ async function apiPost(endpoint, data) {
   });
   return res.json();
 }
- 
+
 async function apiGet(endpoint) {
   const res = await fetch(endpoint);
   return res.json();
 }
- 
+
 // ─── Auth: Check session on load ─────────────────────────────────
 window.addEventListener('load', async () => {
   const data = await fetch('/api/session').then(r => r.json());
@@ -33,25 +33,25 @@ window.addEventListener('load', async () => {
     showDashboard(data.user);
   }
 });
- 
+
 // ─── Register ─────────────────────────────────────────────────────
 async function register() {
-  const name     = document.getElementById('reg-name').value.trim();
-  const email    = document.getElementById('reg-email').value.trim();
-  const mobile   = document.getElementById('reg-mobile').value.trim();
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const mobile = document.getElementById('reg-mobile').value.trim();
   const password = document.getElementById('reg-pass').value.trim();
-  const repass   = document.getElementById('reg-repass').value.trim();
-  const msgEl    = document.getElementById('reg-msg');
- 
+  const repass = document.getElementById('reg-repass').value.trim();
+  const msgEl = document.getElementById('reg-msg');
+
   if (password !== repass) {
     msgEl.textContent = 'Passwords do not match!';
     msgEl.className = 'msg error';
     return;
   }
- 
+
   msgEl.textContent = '';
   const result = await apiPost('/api/register', { name, email, mobile, password });
- 
+
   if (result.success) {
     msgEl.textContent = result.message;
     msgEl.className = 'msg success';
@@ -62,16 +62,16 @@ async function register() {
     msgEl.className = 'msg error';
   }
 }
- 
+
 // ─── Login ────────────────────────────────────────────────────────
 async function login() {
   const identifier = document.getElementById('log-id').value.trim();
-  const password   = document.getElementById('log-pass').value.trim();
-  const msgEl      = document.getElementById('login-msg');
- 
+  const password = document.getElementById('log-pass').value.trim();
+  const msgEl = document.getElementById('login-msg');
+
   msgEl.textContent = '';
   const result = await apiPost('/api/login', { identifier, password });
- 
+
   if (result.success) {
     document.getElementById('log-id').value = '';
     document.getElementById('log-pass').value = '';
@@ -81,7 +81,7 @@ async function login() {
     msgEl.className = 'msg error';
   }
 }
- 
+
 // ─── Logout ───────────────────────────────────────────────────────
 async function logout() {
   await apiPost('/api/logout', {});
@@ -93,17 +93,17 @@ async function logout() {
   document.getElementById('login-form').classList.remove('hidden');
   showToast('Logged out successfully.');
 }
- 
+
 // ─── Show Dashboard ───────────────────────────────────────────────
 function showDashboard(user) {
   document.getElementById('auth-section').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
- 
-  document.getElementById('p-name').textContent   = user.name;
-  document.getElementById('p-email').textContent  = user.email;
+
+  document.getElementById('p-name').textContent = user.name;
+  document.getElementById('p-email').textContent = user.email;
   document.getElementById('p-mobile').textContent = user.mobile;
- 
-  document.getElementById('u-age').value    = user.age    || '';
+
+  document.getElementById('u-age').value = user.age || '';
   document.getElementById('u-height').value = user.height || '';
   document.getElementById('u-weight').value = user.weight || '';
 
@@ -116,13 +116,13 @@ function showDashboard(user) {
   loadCoach();
   loadDashboardHome();
 }
- 
+
 // ─── Save Profile Stats ───────────────────────────────────────────
 async function saveProfile() {
-  const age    = document.getElementById('u-age').value;
+  const age = document.getElementById('u-age').value;
   const height = document.getElementById('u-height').value;
   const weight = document.getElementById('u-weight').value;
- 
+
   const result = await apiPost('/api/profile', { age, height, weight });
   if (result.success) {
     showToast('Profile updated ✓');
@@ -136,7 +136,7 @@ async function saveProfile() {
     loadDashboardHome();
   }
 }
- 
+
 // ─── Toggle Auth Forms ────────────────────────────────────────────
 function toggleAuth() {
   document.getElementById('reg-form').classList.toggle('hidden');
@@ -144,23 +144,23 @@ function toggleAuth() {
   document.getElementById('reg-msg').textContent = '';
   document.getElementById('login-msg').textContent = '';
 }
- 
+
 // ─── Toggle Profile Modal ─────────────────────────────────────────
 function toggleProfile() {
   const m = document.getElementById('profile-modal');
   m.style.display = (m.style.display === 'block') ? 'none' : 'block';
 }
- 
+
 // Close profile modal if clicked outside
 document.addEventListener('click', (e) => {
-  const modal   = document.getElementById('profile-modal');
+  const modal = document.getElementById('profile-modal');
   const trigger = document.querySelector('.profile-trigger');
   if (modal && modal.style.display === 'block' &&
-      !modal.contains(e.target) && !trigger.contains(e.target)) {
+    !modal.contains(e.target) && !trigger.contains(e.target)) {
     modal.style.display = 'none';
   }
 });
- 
+
 // ─── Navigation Tabs ─────────────────────────────────────────────
 function switchSection(sectionId, btn) {
   // Dismiss profile modal if visible
@@ -182,8 +182,8 @@ function switchSection(sectionId, btn) {
     }
   } else {
     // If switched programmatically, try to find and highlight the button
-    const matchingBtn = document.querySelector(`.nav-tab[onclick*="'${sectionId}'"]`) || 
-                        document.querySelector(`.dropdown-item[onclick*="'${sectionId}'"]`);
+    const matchingBtn = document.querySelector(`.nav-tab[onclick*="'${sectionId}'"]`) ||
+      document.querySelector(`.dropdown-item[onclick*="'${sectionId}'"]`);
     if (matchingBtn) {
       matchingBtn.classList.add('active');
       if (matchingBtn.classList.contains('dropdown-item')) {
@@ -207,96 +207,98 @@ function switchSection(sectionId, btn) {
     loadRecommendations();
   } else if (sectionId === 'coach') {
     loadCoach();
+  } else if (sectionId === 'goals') {
+    loadGoals();
   }
 }
- 
+
 // ─── Select Workout Day ───────────────────────────────────────────
 function selectDay(day) {
-  const grid       = document.getElementById('workout-grid');
-  const dayInfo    = document.getElementById('day-info');
-  const warmupSec  = document.getElementById('warmup-section');
+  const grid = document.getElementById('workout-grid');
+  const dayInfo = document.getElementById('day-info');
+  const warmupSec = document.getElementById('warmup-section');
 
   if (!day) {
-    grid.style.display       = 'none';
-    dayInfo.style.display    = 'none';
-    warmupSec.style.display  = 'none';
+    grid.style.display = 'none';
+    dayInfo.style.display = 'none';
+    warmupSec.style.display = 'none';
   } else {
     const dayMap = {
-      Monday:    'CHEST',
-      Tuesday:   'BACK',
+      Monday: 'CHEST',
+      Tuesday: 'BACK',
       Wednesday: 'SHOULDERS',
-      Thursday:  'BICEPS',
-      Friday:    'TRICEPS',
-      Saturday:  'LEGS',
-      Sunday:    'FULL BODY'
+      Thursday: 'BICEPS',
+      Friday: 'TRICEPS',
+      Saturday: 'LEGS',
+      Sunday: 'FULL BODY'
     };
-    grid.style.display       = 'flex';
-    dayInfo.style.display    = 'block';
-    warmupSec.style.display  = 'block';
-    dayInfo.textContent      = `${day.toUpperCase()} — ${dayMap[day] || 'SELECT MUSCLE'}`;
+    grid.style.display = 'flex';
+    dayInfo.style.display = 'block';
+    warmupSec.style.display = 'block';
+    dayInfo.textContent = `${day.toUpperCase()} — ${dayMap[day] || 'SELECT MUSCLE'}`;
   }
 }
- 
+
 // ─── Exercise Data ────────────────────────────────────────────────
 const workoutData = {
   'Warmup': [
-    { name: 'Jumping Jacks',     video: 'https://www.youtube.com/watch?v=UpH7RmJsmUY' },
-    { name: 'Arm Circles',       video: 'https://www.youtube.com/watch?v=OAg0YGxKPzI' },
-    { name: 'Leg Swings',        video: 'https://www.youtube.com/watch?v=3p8EBPVZ2Iw' },
-    { name: 'Torso Twists',      video: 'https://www.youtube.com/watch?v=ExR0m8W5YOc' },
-    { name: 'Shoulder Rolls',    video: 'https://www.youtube.com/watch?v=2Ew6yq7zZ4A' },
-    { name: 'March in Place',    video: 'https://www.youtube.com/watch?v=4n8F7q9zZ2A' }
+    { name: 'Jumping Jacks', video: 'https://www.youtube.com/watch?v=UpH7RmJsmUY' },
+    { name: 'Arm Circles', video: 'https://www.youtube.com/watch?v=OAg0YGxKPzI' },
+    { name: 'Leg Swings', video: 'https://www.youtube.com/watch?v=3p8EBPVZ2Iw' },
+    { name: 'Torso Twists', video: 'https://www.youtube.com/watch?v=ExR0m8W5YOc' },
+    { name: 'Shoulder Rolls', video: 'https://www.youtube.com/watch?v=2Ew6yq7zZ4A' },
+    { name: 'March in Place', video: 'https://www.youtube.com/watch?v=4n8F7q9zZ2A' }
   ],
   'Chest': [
-    { name: 'Standard Pushups',  video: 'https://www.youtube.com/watch?v=WDIpL0pjun0' },
-    { name: 'Bench Press',       video: 'https://www.youtube.com/shorts/hWbUlkb5Ms4' },
-    { name: 'Chest Press',       video: 'https://www.youtube.com/watch?v=VmB1G1K7v94' },
-    { name: 'Pec Flys',          video: 'https://www.youtube.com/shorts/g3T7LsEeDWQ' },
-    { name: 'Incline Press',     video: 'https://www.youtube.com/shorts/ou6s32mJgjU' }
+    { name: 'Standard Pushups', video: 'https://www.youtube.com/watch?v=WDIpL0pjun0' },
+    { name: 'Bench Press', video: 'https://www.youtube.com/shorts/hWbUlkb5Ms4' },
+    { name: 'Chest Press', video: 'https://www.youtube.com/watch?v=VmB1G1K7v94' },
+    { name: 'Pec Flys', video: 'https://www.youtube.com/shorts/g3T7LsEeDWQ' },
+    { name: 'Incline Press', video: 'https://www.youtube.com/shorts/ou6s32mJgjU' }
   ],
   'Shoulders': [
-    { name: 'Overhead Press',    video: 'https://www.youtube.com/watch?v=F3QY5vMz_6I' },
-    { name: 'Lateral Raises',    video: 'https://www.youtube.com/watch?v=geenhiHju-o' },
-    { name: 'Front Raises',      video: 'https://www.youtube.com/watch?v=-t7fuZ0KhDA' },
-    { name: 'Reverse Flys',      video: 'https://www.youtube.com/watch?v=rtkvodbZfGY' },
-    { name: 'Shrugs',            video: 'https://www.youtube.com/watch?v=cJRVVxmytaM' }
+    { name: 'Overhead Press', video: 'https://www.youtube.com/watch?v=F3QY5vMz_6I' },
+    { name: 'Lateral Raises', video: 'https://www.youtube.com/watch?v=geenhiHju-o' },
+    { name: 'Front Raises', video: 'https://www.youtube.com/watch?v=-t7fuZ0KhDA' },
+    { name: 'Reverse Flys', video: 'https://www.youtube.com/watch?v=rtkvodbZfGY' },
+    { name: 'Shrugs', video: 'https://www.youtube.com/watch?v=cJRVVxmytaM' }
   ],
   'Back': [
-    { name: 'Pull Ups',          video: 'https://www.youtube.com/watch?v=eGo4IYlbE5g' },
-    { name: 'Rear Pec Flys',     video: 'https://www.youtube.com/watch?v=JL8nHvZcAK8' },
-    { name: 'Lat Pulldowns',     video: 'https://www.youtube.com/watch?v=lSt1oTrZ_Cc' },
+    { name: 'Pull Ups', video: 'https://www.youtube.com/watch?v=eGo4IYlbE5g' },
+    { name: 'Rear Pec Flys', video: 'https://www.youtube.com/watch?v=JL8nHvZcAK8' },
+    { name: 'Lat Pulldowns', video: 'https://www.youtube.com/watch?v=lSt1oTrZ_Cc' },
     { name: 'Seated Cable Rows', video: 'https://www.youtube.com/watch?v=GZbfZ033f74' },
-    { name: 'Deadlifts',         video: 'https://www.youtube.com/watch?v=XxWcirHIwVo' }
+    { name: 'Deadlifts', video: 'https://www.youtube.com/watch?v=XxWcirHIwVo' }
   ],
   'Biceps': [
-    { name: 'Dumbbell Curls',       video: 'https://www.youtube.com/watch?v=zC3nLlEvin4' },
-    { name: 'Hammer Curls',         video: 'https://www.youtube.com/watch?v=32W1sB5DkHY' },
-    { name: 'Concentration Curls',  video: 'https://www.youtube.com/watch?v=Jvj2wV0vOYU' },
-    { name: 'Preacher Curls',       video: 'https://www.youtube.com/watch?v=Gydpcouclx8' },
-    { name: 'Barbell Curls',        video: 'https://www.youtube.com/watch?v=N6paU6TGFWU' }
+    { name: 'Dumbbell Curls', video: 'https://www.youtube.com/watch?v=zC3nLlEvin4' },
+    { name: 'Hammer Curls', video: 'https://www.youtube.com/watch?v=32W1sB5DkHY' },
+    { name: 'Concentration Curls', video: 'https://www.youtube.com/watch?v=Jvj2wV0vOYU' },
+    { name: 'Preacher Curls', video: 'https://www.youtube.com/watch?v=Gydpcouclx8' },
+    { name: 'Barbell Curls', video: 'https://www.youtube.com/watch?v=N6paU6TGFWU' }
   ],
   'Legs': [
     { name: 'Bodyweight Squats', video: 'https://www.youtube.com/watch?v=P-yaD24bUE8' },
-    { name: 'Lunges',            video: 'https://www.youtube.com/watch?v=wrwwXE_x-pQ' },
-    { name: 'Calf Raises',       video: 'https://www.youtube.com/watch?v=c5Kv6-fnTj8' },
-    { name: 'Leg Extensions',    video: 'https://www.youtube.com/watch?v=YyvSfVjQeL0' },
-    { name: 'Hamstring Curls',   video: 'https://www.youtube.com/shorts/Lh3iMIcbkBQ' },
-    { name: 'Glute Bridges',     video: 'https://www.youtube.com/watch?v=OUgsJ8-Vi0E' }
+    { name: 'Lunges', video: 'https://www.youtube.com/watch?v=wrwwXE_x-pQ' },
+    { name: 'Calf Raises', video: 'https://www.youtube.com/watch?v=c5Kv6-fnTj8' },
+    { name: 'Leg Extensions', video: 'https://www.youtube.com/watch?v=YyvSfVjQeL0' },
+    { name: 'Hamstring Curls', video: 'https://www.youtube.com/shorts/Lh3iMIcbkBQ' },
+    { name: 'Glute Bridges', video: 'https://www.youtube.com/watch?v=OUgsJ8-Vi0E' }
   ],
   'Triceps': [
-    { name: 'Tricep Dips',                  video: 'https://www.youtube.com/watch?v=thx13oPVK5c' },
-    { name: 'Diamond Pushups',              video: 'https://www.youtube.com/watch?v=t2cR426fFx0' },
-    { name: 'Tricep Kickbacks',             video: 'https://www.youtube.com/watch?v=3Bv1n7-DN7c' },
-    { name: 'Overhead Tricep Extensions',   video: 'https://www.youtube.com/watch?v=fYqswDVbJDg' },
-    { name: 'Cable Tricep Pushdowns',       video: 'https://www.youtube.com/watch?v=_w-HpW70nSQ' }
+    { name: 'Tricep Dips', video: 'https://www.youtube.com/watch?v=thx13oPVK5c' },
+    { name: 'Diamond Pushups', video: 'https://www.youtube.com/watch?v=t2cR426fFx0' },
+    { name: 'Tricep Kickbacks', video: 'https://www.youtube.com/watch?v=3Bv1n7-DN7c' },
+    { name: 'Overhead Tricep Extensions', video: 'https://www.youtube.com/watch?v=fYqswDVbJDg' },
+    { name: 'Cable Tricep Pushdowns', video: 'https://www.youtube.com/watch?v=_w-HpW70nSQ' }
   ]
 };
- 
+
 // ─── Open Exercise Popup ──────────────────────────────────────────
 function openExercise(muscle) {
-  const view    = document.getElementById('exercise-view');
+  const view = document.getElementById('exercise-view');
   const overlay = document.getElementById('screen-overlay');
-  const list    = document.getElementById('ex-list');
+  const list = document.getElementById('ex-list');
 
   document.getElementById('ex-title').textContent = muscle + ' Workouts';
 
@@ -321,7 +323,7 @@ function openExercise(muscle) {
       </div>`;
   }).join('');
 
-  view.style.display    = 'block';
+  view.style.display = 'block';
   overlay.style.display = 'block';
 }
 
@@ -363,64 +365,121 @@ function closeEx() {
   document.getElementById('exercise-view').style.display = 'none';
   document.getElementById('screen-overlay').style.display = 'none';
 }
- 
+
 // ─── Book Trainer ─────────────────────────────────────────────────
 function bookTrainer(trainerName) {
   showToast(`✅ Booking request sent for ${trainerName}! We'll contact you soon.`);
 }
- 
+
 // ─── Goals: Load ──────────────────────────────────────────────────
 async function loadGoals() {
   const data = await apiGet('/api/goals');
   if (data.success) renderGoals(data.goals);
 }
- 
+
 // ─── Goals: Render ─────────────────────────────────────────────────
 function renderGoals(goals) {
   const activeArea = document.getElementById('active-goal-area');
-  const pastArea   = document.getElementById('past-goals-area');
-  const newBtn     = document.getElementById('btn-new-goal');
+  const pausedArea = document.getElementById('paused-goals-area');
+  const pastArea = document.getElementById('past-goals-area');
+  const newBtn = document.getElementById('btn-new-goal');
+  const countBadge = document.getElementById('goals-count-badge');
   if (!activeArea) return;
 
   const activeGoals = goals.filter(g => g.status === 'active');
-  const pastGoals   = goals.filter(g => g.status !== 'active');
+  const pausedGoals = goals.filter(g => g.status === 'paused');
+  const pastGoals = goals.filter(g => g.status === 'completed' || g.status === 'cancelled');
 
+  if (countBadge) {
+    countBadge.textContent = `${activeGoals.length} / 3 Active`;
+  }
+
+  if (newBtn) {
+    if (activeGoals.length >= 3) {
+      newBtn.disabled = true;
+      newBtn.classList.add('disabled');
+      newBtn.title = 'Maximum 3 active goals reached. Complete or pause an existing goal to set a new one.';
+    } else {
+      newBtn.disabled = false;
+      newBtn.classList.remove('disabled');
+      newBtn.title = 'Set a new health goal';
+    }
+  }
+
+  // 1. Active Goals Area
   if (activeGoals.length === 0) {
     activeArea.innerHTML = `
       <div class="goals-empty">
-        <i class="fas fa-map-location-dot"></i>
-        <h3>No active goal yet</h3>
-        <p>Set your first health goal to begin mapping your journey.</p>
-        <button class="btn-main" style="width:auto;padding:12px 28px;" onclick="openGoalModal()">
+        <i class="fas fa-bullseye"></i>
+        <h3>No active goal right now</h3>
+        <p>You can have up to 3 concurrent active goals. Set a goal to track your fitness journey.</p>
+        <button class="btn-main" style="width:auto;padding:12px 28px;margin-top:12px;" onclick="openGoalModal()">
           <i class="fas fa-plus"></i>&nbsp; Set My First Goal
         </button>
       </div>`;
-    if (newBtn) newBtn.style.display = 'none';
   } else {
-    if (newBtn) newBtn.style.display = 'flex';
-    activeArea.innerHTML = activeGoals.map(goalCardHTML).join('');
+    activeArea.innerHTML = `
+      <div class="active-goals-grid">
+        ${activeGoals.map(goalCardHTML).join('')}
+      </div>`;
   }
 
-  if (pastGoals.length > 0) {
-    pastArea.innerHTML = `
-      <p class="past-goals-title">Past Goals</p>
-      ${pastGoals.map(g => `
-        <div class="past-goal-item">
-          <div class="past-goal-info">
-            <h4>${escapeHtml(g.goal_name || goalTypeLabel(g.goal_type))}</h4>
-            <p>${g.start_weight} kg → ${g.target_weight} kg &nbsp;·&nbsp; Target: ${formatDate(g.target_date)}</p>
+  // 2. Paused Goals Area
+  if (pausedArea) {
+    if (pausedGoals.length > 0) {
+      pausedArea.innerHTML = `
+        <div class="paused-goals-section">
+          <p class="past-goals-title"><i class="fas fa-pause-circle" style="color:var(--warning-amber);margin-right:6px;"></i> Paused Goals (${pausedGoals.length})</p>
+          <div class="paused-goals-grid">
+            ${pausedGoals.map(pausedGoalCardHTML).join('')}
           </div>
-          <span class="status-badge-${g.status}">${capitalize(g.status)}</span>
-        </div>`).join('')}`;
-  } else {
-    pastArea.innerHTML = '';
+        </div>`;
+    } else {
+      pausedArea.innerHTML = '';
+    }
+  }
+
+  // 3. Past Goals Area (Completed & Cancelled)
+  if (pastArea) {
+    if (pastGoals.length > 0) {
+      pastArea.innerHTML = `
+        <div class="past-goals-section">
+          <p class="past-goals-title">Past Goals (${pastGoals.length})</p>
+          <div class="past-goals-list">
+            ${pastGoals.map(g => `
+              <div class="past-goal-item">
+                <div class="past-goal-info">
+                  <h4>${escapeHtml(g.goal_name || goalTypeLabel(g.goal_type))}</h4>
+                  <p>${g.start_weight} kg → ${g.target_weight} kg &nbsp;·&nbsp; Target: ${formatDate(g.target_date)}</p>
+                </div>
+                <span class="status-badge-${g.status}">${capitalize(g.status)}</span>
+              </div>`).join('')}
+          </div>
+        </div>`;
+    } else {
+      pastArea.innerHTML = '';
+    }
   }
 }
- 
-// ─── Goals: Card HTML ──────────────────────────────────────────────
+
+// ─── Goals: Active Card HTML ───────────────────────────────────────
 function goalCardHTML(g) {
-  const daysLeft = Math.max(0, Math.ceil((new Date(g.target_date) - new Date()) / (1000*60*60*24)));
+  const daysLeft = Math.max(0, Math.ceil((new Date(g.target_date) - new Date()) / (1000 * 60 * 60 * 24)));
   const badgeClass = `badge-${g.goal_type}`;
+
+  // Nutrition targets markup if defined
+  let macrosHTML = '';
+  if (g.target_calories || g.target_protein_g || g.target_carbs_g || g.target_fats_g) {
+    macrosHTML = `
+      <div class="goal-macro-targets">
+        ${g.target_calories ? `<span class="macro-chip cal"><i class="fas fa-fire"></i> ${g.target_calories} kcal</span>` : ''}
+        ${g.target_protein_g ? `<span class="macro-chip prot"><i class="fas fa-drumstick-bite"></i> ${g.target_protein_g}g P</span>` : ''}
+        ${g.target_carbs_g ? `<span class="macro-chip carb"><i class="fas fa-wheat-awn"></i> ${g.target_carbs_g}g C</span>` : ''}
+        ${g.target_fats_g ? `<span class="macro-chip fat"><i class="fas fa-droplet"></i> ${g.target_fats_g}g F</span>` : ''}
+      </div>
+    `;
+  }
+
   return `
     <div class="goal-card">
       <div class="goal-card-header">
@@ -429,11 +488,68 @@ function goalCardHTML(g) {
           <span class="goal-type-badge ${badgeClass}">${goalTypeLabel(g.goal_type)}</span>
         </div>
         <div class="goal-card-actions">
-          <button class="btn-goal-edit" onclick="openGoalModal('${g.id}')">
+          <button class="btn-goal-edit" title="Edit goal" onclick="openGoalModal('${g.id}')">
             <i class="fas fa-pen"></i> Edit
           </button>
-          <button class="btn-goal-complete" onclick="updateGoalStatus('${g.id}','completed')">
+          <button class="btn-goal-pause" title="Pause goal" onclick="updateGoalStatus('${g.id}','paused')">
+            <i class="fas fa-pause"></i> Pause
+          </button>
+          <button class="btn-goal-complete" title="Mark as completed" onclick="updateGoalStatus('${g.id}','completed')">
             <i class="fas fa-check"></i> Complete
+          </button>
+          <button class="btn-goal-cancel-action" title="Cancel goal" onclick="updateGoalStatus('${g.id}','cancelled')">
+            <i class="fas fa-xmark"></i> Cancel
+          </button>
+        </div>
+      </div>
+
+      <div class="goal-stats">
+        <div class="goal-stat">
+          <div class="stat-label">Start</div>
+          <div class="stat-value">${g.start_weight} kg</div>
+        </div>
+        <div class="goal-stat">
+          <div class="stat-label">Current</div>
+          <div class="stat-value current">${g.current_weight} kg</div>
+        </div>
+        <div class="goal-stat">
+          <div class="stat-label">Target</div>
+          <div class="stat-value target">${g.target_weight} kg</div>
+        </div>
+      </div>
+
+      ${macrosHTML}
+
+      <div class="goal-progress-section">
+        <div class="goal-progress-label">
+          <span>Progress</span>
+          <span class="pct">${g.progress_pct}%</span>
+        </div>
+        <div class="goal-progress-bar">
+          <div class="goal-progress-fill" style="width:${g.progress_pct}%"></div>
+        </div>
+      </div>
+
+      <div class="goal-days">
+        <span>${daysLeft}</span> days remaining · Target: ${formatDate(g.target_date)}
+      </div>
+    </div>`;
+}
+
+// ─── Goals: Paused Card HTML ───────────────────────────────────────
+function pausedGoalCardHTML(g) {
+  const badgeClass = `badge-${g.goal_type}`;
+  return `
+    <div class="goal-card paused">
+      <div class="goal-card-header">
+        <div class="goal-card-title">
+          <h3>${escapeHtml(g.goal_name || goalTypeLabel(g.goal_type))}</h3>
+          <span class="goal-type-badge ${badgeClass}">${goalTypeLabel(g.goal_type)}</span>
+          <span class="status-badge-paused">Paused</span>
+        </div>
+        <div class="goal-card-actions">
+          <button class="btn-goal-resume" onclick="updateGoalStatus('${g.id}','active')">
+            <i class="fas fa-play"></i> Resume
           </button>
           <button class="btn-goal-cancel-action" onclick="updateGoalStatus('${g.id}','cancelled')">
             <i class="fas fa-xmark"></i> Cancel
@@ -456,40 +572,34 @@ function goalCardHTML(g) {
         </div>
       </div>
 
-      <div class="goal-progress-section">
-        <div class="goal-progress-label">
-          <span>Progress</span>
-          <span class="pct">${g.progress_pct}%</span>
-        </div>
-        <div class="goal-progress-bar">
-          <div class="goal-progress-fill" style="width:${g.progress_pct}%"></div>
-        </div>
-      </div>
-
       <div class="goal-days">
-        <span>${daysLeft}</span> days remaining · Target: ${formatDate(g.target_date)}
+        Target: ${formatDate(g.target_date)} · Paused
       </div>
     </div>`;
 }
- 
+
 // ─── Goals: Open Modal ─────────────────────────────────────────────
 async function openGoalModal(goalId) {
   const overlay = document.getElementById('goal-modal-overlay');
-  const modal   = document.getElementById('goal-modal');
-  const title   = document.getElementById('goal-modal-title');
-  const submit  = document.getElementById('btn-goal-submit');
-  const msg     = document.getElementById('goal-modal-msg');
+  const modal = document.getElementById('goal-modal');
+  const title = document.getElementById('goal-modal-title');
+  const submit = document.getElementById('btn-goal-submit');
+  const msg = document.getElementById('goal-modal-msg');
 
-  // Reset
-  document.getElementById('goal-edit-id').value       = '';
-  document.getElementById('goal-name').value          = '';
-  document.getElementById('goal-type-value').value    = '';
-  document.getElementById('goal-start-weight').value  = '';
+  // Reset fields
+  document.getElementById('goal-edit-id').value = '';
+  document.getElementById('goal-name').value = '';
+  document.getElementById('goal-type-value').value = '';
+  document.getElementById('goal-start-weight').value = '';
   document.getElementById('goal-target-weight').value = '';
-  document.getElementById('goal-target-date').value   = '';
+  document.getElementById('goal-target-date').value = '';
+  document.getElementById('goal-target-calories').value = '';
+  document.getElementById('goal-target-protein').value = '';
+  document.getElementById('goal-target-carbs').value = '';
+  document.getElementById('goal-target-fats').value = '';
   document.getElementById('goal-start-weight').disabled = false;
   msg.textContent = '';
-  msg.className   = 'msg';
+  msg.className = 'msg';
   document.querySelectorAll('.goal-type-option').forEach(el => {
     el.classList.remove('selected');
     el.style.pointerEvents = '';
@@ -497,7 +607,7 @@ async function openGoalModal(goalId) {
   });
 
   if (goalId) {
-    title.textContent  = 'Edit Goal';
+    title.textContent = 'Edit Goal';
     submit.textContent = 'Save Changes';
     document.getElementById('goal-edit-id').value = goalId;
 
@@ -505,10 +615,14 @@ async function openGoalModal(goalId) {
     if (data.success) {
       const g = data.goals.find(g => g.id === goalId);
       if (g) {
-        document.getElementById('goal-name').value          = g.goal_name || '';
-        document.getElementById('goal-start-weight').value  = g.start_weight;
+        document.getElementById('goal-name').value = g.goal_name || '';
+        document.getElementById('goal-start-weight').value = g.start_weight;
         document.getElementById('goal-target-weight').value = g.target_weight;
-        document.getElementById('goal-target-date').value   = (g.target_date || '').split('T')[0];
+        document.getElementById('goal-target-date').value = (g.target_date || '').split('T')[0];
+        if (g.target_calories) document.getElementById('goal-target-calories').value = g.target_calories;
+        if (g.target_protein_g) document.getElementById('goal-target-protein').value = g.target_protein_g;
+        if (g.target_carbs_g) document.getElementById('goal-target-carbs').value = g.target_carbs_g;
+        if (g.target_fats_g) document.getElementById('goal-target-fats').value = g.target_fats_g;
         selectGoalType(g.goal_type);
         // Lock immutable fields in edit mode
         document.getElementById('goal-start-weight').disabled = true;
@@ -519,25 +633,25 @@ async function openGoalModal(goalId) {
       }
     }
   } else {
-    title.textContent  = 'Set New Goal';
+    title.textContent = 'Set New Goal';
     submit.textContent = 'Create Goal';
   }
 
   overlay.style.display = 'block';
-  modal.style.display   = 'block';
+  modal.style.display = 'block';
 }
- 
+
 // ─── Goals: Close Modal ───────────────────────────────────────────
 function closeGoalModal() {
   document.getElementById('goal-modal-overlay').style.display = 'none';
-  document.getElementById('goal-modal').style.display         = 'none';
-  document.getElementById('goal-start-weight').disabled       = false;
+  document.getElementById('goal-modal').style.display = 'none';
+  document.getElementById('goal-start-weight').disabled = false;
   document.querySelectorAll('.goal-type-option').forEach(el => {
     el.style.pointerEvents = '';
     el.style.opacity = '';
   });
 }
- 
+
 // ─── Goals: Select Type ──────────────────────────────────────────
 function selectGoalType(type) {
   document.getElementById('goal-type-value').value = type;
@@ -545,19 +659,23 @@ function selectGoalType(type) {
     el.classList.toggle('selected', el.dataset.type === type);
   });
 }
- 
+
 // ─── Goals: Submit (Create or Edit) ───────────────────────────────
 async function submitGoal() {
-  const editId        = document.getElementById('goal-edit-id').value;
-  const goal_name     = document.getElementById('goal-name').value.trim();
-  const goal_type     = document.getElementById('goal-type-value').value;
-  const start_weight  = document.getElementById('goal-start-weight').value;
+  const editId = document.getElementById('goal-edit-id').value;
+  const goal_name = document.getElementById('goal-name').value.trim();
+  const goal_type = document.getElementById('goal-type-value').value;
+  const start_weight = document.getElementById('goal-start-weight').value;
   const target_weight = document.getElementById('goal-target-weight').value;
-  const target_date   = document.getElementById('goal-target-date').value;
-  const msg           = document.getElementById('goal-modal-msg');
+  const target_date = document.getElementById('goal-target-date').value;
+  const target_calories = document.getElementById('goal-target-calories').value;
+  const target_protein_g = document.getElementById('goal-target-protein').value;
+  const target_carbs_g = document.getElementById('goal-target-carbs').value;
+  const target_fats_g = document.getElementById('goal-target-fats').value;
+  const msg = document.getElementById('goal-modal-msg');
 
   msg.textContent = '';
-  msg.className   = 'msg';
+  msg.className = 'msg';
 
   if (!editId && !goal_type) {
     msg.textContent = 'Please select a goal type.'; msg.className = 'msg error'; return;
@@ -571,25 +689,32 @@ async function submitGoal() {
   if (!target_date) {
     msg.textContent = 'Please select a target date.'; msg.className = 'msg error'; return;
   }
-  const today = new Date(); today.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
   if (new Date(target_date) <= today) {
     msg.textContent = 'Target date must be in the future.'; msg.className = 'msg error'; return;
   }
+
+  const payload = {
+    goal_name,
+    target_weight: parseFloat(target_weight),
+    target_date,
+    target_calories: target_calories ? parseInt(target_calories, 10) : null,
+    target_protein_g: target_protein_g ? parseInt(target_protein_g, 10) : null,
+    target_carbs_g: target_carbs_g ? parseInt(target_carbs_g, 10) : null,
+    target_fats_g: target_fats_g ? parseInt(target_fats_g, 10) : null
+  };
 
   let result;
   if (editId) {
     result = await fetch(`/api/goals/${editId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ goal_name, target_weight: parseFloat(target_weight), target_date })
+      body: JSON.stringify(payload)
     }).then(r => r.json());
   } else {
-    result = await apiPost('/api/goals', {
-      goal_name, goal_type,
-      start_weight: parseFloat(start_weight),
-      target_weight: parseFloat(target_weight),
-      target_date
-    });
+    payload.goal_type = goal_type;
+    payload.start_weight = parseFloat(start_weight);
+    result = await apiPost('/api/goals', payload);
   }
 
   if (result.success) {
@@ -605,14 +730,24 @@ async function submitGoal() {
     showToast(editId ? '✓ Goal updated.' : '✓ Goal created! Your journey has begun.');
   } else {
     msg.textContent = result.message;
-    msg.className   = 'msg error';
+    msg.className = 'msg error';
   }
 }
- 
-// ─── Goals: Update Status ──────────────────────────────────────────
+
+// ─── Goals: Update Status (Pause, Resume, Complete, Cancel) ────────
 async function updateGoalStatus(goalId, status) {
-  const label = status === 'completed' ? 'mark this goal as completed' : 'cancel this goal';
-  if (!confirm(`Are you sure you want to ${label}? This cannot be undone.`)) return;
+  let promptMsg = '';
+  if (status === 'completed') {
+    promptMsg = 'Mark this goal as completed? This cannot be undone.';
+  } else if (status === 'paused') {
+    promptMsg = 'Pause this goal? You can resume it anytime when you have fewer than 3 active goals.';
+  } else if (status === 'active') {
+    promptMsg = 'Resume this goal as active?';
+  } else if (status === 'cancelled') {
+    promptMsg = 'Cancel this goal? This cannot be undone.';
+  }
+
+  if (promptMsg && !confirm(promptMsg)) return;
 
   const result = await fetch(`/api/goals/${goalId}/status`, {
     method: 'PATCH',
@@ -629,12 +764,19 @@ async function updateGoalStatus(goalId, status) {
     loadRecommendations();
     loadCoach();
     loadDashboardHome();
-    showToast(status === 'completed' ? '🎉 Goal completed! Well done.' : 'Goal cancelled.');
+
+    let toastText = 'Goal updated.';
+    if (status === 'completed') toastText = '🎉 Goal completed! Excellent job.';
+    else if (status === 'paused') toastText = '⏸️ Goal paused.';
+    else if (status === 'active') toastText = '▶️ Goal resumed as active!';
+    else if (status === 'cancelled') toastText = 'Goal cancelled.';
+
+    showToast(toastText);
   } else {
     showToast('Error: ' + result.message);
   }
 }
- 
+
 // ─── Goals: Helpers ─────────────────────────────────────────────────
 function goalTypeLabel(type) {
   return { weight_loss: 'Weight Loss', muscle_gain: 'Muscle Gain', maintenance: 'Maintenance' }[type] || type;
@@ -647,18 +789,18 @@ function formatDate(dateStr) {
 
 function escapeHtml(str) {
   if (!str) return '';
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function capitalize(str) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
 }
- 
+
 // ─── Enter key support for forms ──────────────────────────────────
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
   const loginForm = document.getElementById('login-form');
-  const regForm   = document.getElementById('reg-form');
+  const regForm = document.getElementById('reg-form');
   if (loginForm && !loginForm.classList.contains('hidden')) login();
   else if (regForm && !regForm.classList.contains('hidden')) register();
 });
@@ -754,26 +896,26 @@ function renderJourney(data) {
           
           <!-- Plotted Milestones -->
           ${milestones.map((m, idx) => {
-            const coords = [
-              {x: 180, y: 500}, // Seq 0 - Starting Point
-              {x: 100, y: 390}, // Seq 1 - First Step
-              {x: 260, y: 280}, // Seq 2 - Halfway Hero
-              {x: 100, y: 170}, // Seq 3 - Momentum
-              {x: 180, y: 60}   // Seq 4 - Destination
-            ][idx];
-            
-            const nodeClass = m.is_completed ? 'completed' : 'locked';
-            const nodeRadius = idx === 0 || idx === 4 ? 14 : 10;
-            const dotRadius = idx === 0 || idx === 4 ? 6 : 4;
-            const glowClass = m.is_completed ? 'glow-filter' : '';
-            
-            return `
+    const coords = [
+      { x: 180, y: 500 }, // Seq 0 - Starting Point
+      { x: 100, y: 390 }, // Seq 1 - First Step
+      { x: 260, y: 280 }, // Seq 2 - Halfway Hero
+      { x: 100, y: 170 }, // Seq 3 - Momentum
+      { x: 180, y: 60 }   // Seq 4 - Destination
+    ][idx];
+
+    const nodeClass = m.is_completed ? 'completed' : 'locked';
+    const nodeRadius = idx === 0 || idx === 4 ? 14 : 10;
+    const dotRadius = idx === 0 || idx === 4 ? 6 : 4;
+    const glowClass = m.is_completed ? 'glow-filter' : '';
+
+    return `
               <g class="journey-node ${glowClass}" onclick="showJourneyTooltip('${escapeHtml(m.title)}', '${escapeHtml(m.description)}', ${m.is_completed})">
                 <circle cx="${coords.x}" cy="${coords.y}" r="${nodeRadius}" class="node-bg ${nodeClass}" />
                 <circle cx="${coords.x}" cy="${coords.y}" r="${dotRadius}" class="node-dot ${nodeClass}" />
               </g>
             `;
-          }).join('')}
+  }).join('')}
           
           <!-- Pulsing Current Position Indicator -->
           <g class="current-marker" id="journey-current-marker" style="display:none;">
@@ -822,17 +964,17 @@ function renderJourney(data) {
           <h3>Checkpoints</h3>
           <div class="timeline-list">
             ${milestones.map((m, idx) => {
-              const activeClass = !m.is_completed && (idx === 0 || milestones[idx-1]?.is_completed) ? 'active' : '';
-              const completedClass = m.is_completed ? 'completed' : '';
-              
-              let statusIconHTML = '<i class="fas fa-lock timeline-item-status-icon locked"></i>';
-              if (m.is_completed) {
-                statusIconHTML = '<i class="fas fa-check-circle timeline-item-status-icon completed"></i>';
-              } else if (activeClass) {
-                statusIconHTML = '<i class="fas fa-spinner fa-spin timeline-item-status-icon active" style="color:var(--primary-teal);"></i>';
-              }
-              
-              return `
+    const activeClass = !m.is_completed && (idx === 0 || milestones[idx - 1]?.is_completed) ? 'active' : '';
+    const completedClass = m.is_completed ? 'completed' : '';
+
+    let statusIconHTML = '<i class="fas fa-lock timeline-item-status-icon locked"></i>';
+    if (m.is_completed) {
+      statusIconHTML = '<i class="fas fa-check-circle timeline-item-status-icon completed"></i>';
+    } else if (activeClass) {
+      statusIconHTML = '<i class="fas fa-spinner fa-spin timeline-item-status-icon active" style="color:var(--primary-teal);"></i>';
+    }
+
+    return `
                 <div class="timeline-item ${completedClass} ${activeClass}">
                   <div class="timeline-item-dot"></div>
                   <div class="timeline-item-content">
@@ -842,7 +984,7 @@ function renderJourney(data) {
                   ${statusIconHTML}
                 </div>
               `;
-            }).join('')}
+  }).join('')}
           </div>
         </div>
         
@@ -864,7 +1006,7 @@ function getNavigatorGuidance(g, cw, milestones, pct) {
   if (pct >= 100) {
     return `🎉 Destination reached! You have completed your goal. Outstanding work on mapping this journey successfully! Ready to set your next peak?`;
   }
-  
+
   if (g.goal_type === 'maintenance') {
     if (Math.abs(cw - g.target_weight) > 2) {
       return `⚠️ Navigator alert: Your current weight is outside your stability zone (${(g.target_weight - 2).toFixed(1)} - ${(g.target_weight + 2).toFixed(1)} kg). Log metrics regularly and adjust calories to get back on course.`;
@@ -889,9 +1031,9 @@ function drawJourneyMap(progressPct) {
 
   const pathLength = path.getTotalLength();
   path.style.strokeDasharray = pathLength;
-  path.style.strokeDashoffset = pathLength; 
+  path.style.strokeDashoffset = pathLength;
 
-  path.getBoundingClientRect(); 
+  path.getBoundingClientRect();
 
   const fillOffset = pathLength * (1 - progressPct / 100);
   path.style.strokeDashoffset = fillOffset;
@@ -904,17 +1046,17 @@ function drawJourneyMap(progressPct) {
 // ─── Journey Map: Bezier Interpolation Math (Phase 3) ───────────────
 function getPositionOnPath(progressPct) {
   const t = progressPct / 100;
-  
+
   const segments = [
-    { start: {x: 180, y: 500}, ctrl: {x: 100, y: 445}, end: {x: 100, y: 390} }, 
-    { start: {x: 100, y: 390}, ctrl: {x: 180, y: 335}, end: {x: 260, y: 280} }, 
-    { start: {x: 260, y: 280}, ctrl: {x: 180, y: 225}, end: {x: 100, y: 170} }, 
-    { start: {x: 100, y: 170}, ctrl: {x: 180, y: 115}, end: {x: 180, y: 60}  }  
+    { start: { x: 180, y: 500 }, ctrl: { x: 100, y: 445 }, end: { x: 100, y: 390 } },
+    { start: { x: 100, y: 390 }, ctrl: { x: 180, y: 335 }, end: { x: 260, y: 280 } },
+    { start: { x: 260, y: 280 }, ctrl: { x: 180, y: 225 }, end: { x: 100, y: 170 } },
+    { start: { x: 100, y: 170 }, ctrl: { x: 180, y: 115 }, end: { x: 180, y: 60 } }
   ];
 
   let segmentIdx = Math.min(3, Math.floor(t * 4));
-  let s = (t - segmentIdx * 0.25) / 0.25; 
-  s = Math.max(0, Math.min(1, s)); 
+  let s = (t - segmentIdx * 0.25) / 0.25;
+  s = Math.max(0, Math.min(1, s));
 
   const seg = segments[segmentIdx];
   const u = 1 - s;
@@ -962,8 +1104,29 @@ async function loadAnalytics() {
 
   try {
     const response = await fetch('/api/progress/analytics').then(r => r.json());
+    let progressSignals = null;
+    try {
+      const signalsRes = await fetch('/api/progress/signals').then(r => r.json());
+      if (signalsRes && signalsRes.success) progressSignals = signalsRes;
+    } catch (signalErr) {
+      console.error('Progress signals fetch failed (non-critical):', signalErr);
+    }
+    let goalAchievement = null;
+    try {
+      const achieveRes = await fetch('/api/goals/achievement').then(r => r.json());
+      if (achieveRes && achieveRes.success) goalAchievement = achieveRes;
+    } catch (achieveErr) {
+      console.error('Goal achievement fetch failed (non-critical):', achieveErr);
+    }
+    let personalizedRec = null;
+    try {
+      const recRes = await fetch('/api/recommendations/personalized').then(r => r.json());
+      if (recRes && recRes.success) personalizedRec = recRes;
+    } catch (recErr) {
+      console.error('Personalized rec fetch failed (non-critical):', recErr);
+    }
     if (response.success) {
-      renderAnalyticsView(response);
+      renderAnalyticsView(response, progressSignals, goalAchievement, personalizedRec);
     } else {
       container.innerHTML = `
         <div class="journey-empty-card">
@@ -983,8 +1146,197 @@ async function loadAnalytics() {
   }
 }
 
+// ─── Progress Signal Note: Render Helper (Capability 3) ─────────────
+function renderProgressSignalNote(progressSignals) {
+  if (!progressSignals || !progressSignals.primary) return '';
+  const p = progressSignals.primary;
+  if (p.type === 'none' || p.type === 'insufficient') return '';
+  const typeClass = 'signal-' + String(p.type || 'none').replace(/_/g, '-');
+  return `
+          <div class="progress-signal-note ${typeClass}" style="margin-top: 14px; display: flex; align-items: flex-start; gap: 14px;">
+            <span class="badge-signal ${typeClass}">${escapeHtml(p.title || 'Progress note')}</span>
+            <p style="margin: 0; line-height: 1.5; font-size: 13px;">${escapeHtml(p.explanation || '')}</p>
+          </div>`;
+}
+
+// ─── Capability 4 Preview Note: Render Helper (Analytics Preview) ───
+function renderAnalyticsRecPreview(personalizedRec) {
+  if (!personalizedRec || !personalizedRec.primary) return '';
+  const p = personalizedRec.primary;
+  const priority = p.priority || 'medium';
+  return `
+    <div class="analytics-rec-preview-box" style="margin-top: 14px; background: rgba(20, 184, 166, 0.06); border: 1px solid rgba(20, 184, 166, 0.22); border-radius: 12px; padding: 14px 16px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+        <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--primary-teal); display: flex; align-items: center; gap: 6px;">
+          <i class="fas fa-compass"></i> Recommended Next Focus
+        </span>
+        <span class="prio-badge badge-${priority}" style="font-size: 10px; padding: 2px 8px;">${priority.toUpperCase()} PRIORITY</span>
+      </div>
+      <h4 style="margin: 0 0 4px 0; font-size: 13.5px; font-weight: 700; color: #fff;">${escapeHtml(p.title)}</h4>
+      <p style="margin: 0 0 10px 0; font-size: 12.5px; color: rgba(255,255,255,0.75); line-height: 1.45;">${escapeHtml(p.action)}</p>
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+        <span style="font-size: 11.5px; color: rgba(255,255,255,0.5);"><i class="fas fa-circle-question"></i> ${escapeHtml(p.reason)}</span>
+        <button class="btn-text-link" onclick="switchSection('recommendations', document.querySelector('.nav-tab[onclick*=\\'recommendations\\']'))" style="font-size: 12px; color: var(--primary-teal); background: none; border: none; padding: 0; cursor: pointer; font-weight: 600; white-space: nowrap;">
+          View Recommendations <i class="fas fa-arrow-right" style="font-size: 10px;"></i>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// ─── Goal Achievement: Render Helper (Capability 2) ─────────────────
+function renderGoalAchievementCard(goalAchievement) {
+  if (!goalAchievement) return '';
+
+  if (goalAchievement.status === 'no_goal') {
+    return `
+      <div class="analytics-card goal-achievement-card">
+        <div class="achievement-header-row">
+          <div class="achievement-title-area">
+            <i class="fas fa-bullseye" style="color:var(--primary);"></i>
+            <h3>Goal Achievement</h3>
+          </div>
+        </div>
+        <p style="margin: 12px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.5;">
+          Analytics requires an active goal to perform trajectory predictions and estimate achievement timelines.
+        </p>
+      </div>`;
+  }
+
+  if (goalAchievement.status === 'insufficient_data') {
+    const obs = goalAchievement.evidence ? goalAchievement.evidence.observations : 0;
+    const span = goalAchievement.evidence ? goalAchievement.evidence.spanDays : 0;
+    return `
+      <div class="analytics-card goal-achievement-card">
+        <div class="achievement-header-row">
+          <div class="achievement-title-area">
+            <i class="fas fa-bullseye" style="color:var(--primary);"></i>
+            <h3>Goal Achievement</h3>
+          </div>
+          <span class="badge-status-insufficient" style="padding: 3px 10px; font-size: 10.5px; font-weight: 700;">INSUFFICIENT DATA</span>
+        </div>
+        <div class="achievement-guidance-box" style="margin-top: 14px;">
+          <i class="fas fa-chart-line" style="color:var(--primary); font-size: 16px; margin-top: 2px;"></i>
+          <div>
+            <h4 style="margin: 0 0 4px; font-size: 13px; font-weight: 700; color: var(--text-primary);">Not enough personal history yet</h4>
+            <p style="margin: 0; line-height: 1.5; font-size: 13px; color: var(--text-secondary);">
+              Keep logging your weight so MapMyHealth can estimate your goal trajectory. We require at least 5 check-ins across 10 or more calendar days.
+            </p>
+            <div style="margin-top: 8px; font-size: 11.5px; color: rgba(255,255,255,0.45);">
+              Current data: <strong>${obs} check-in${obs === 1 ? '' : 's'}</strong> across <strong>${span} calendar day${span === 1 ? '' : 's'}</strong>.
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  const g = goalAchievement.goal || {};
+  const o = goalAchievement.outlook || {};
+  const f = goalAchievement.forecast || {};
+  const c = goalAchievement.confidence || {};
+  const p = goalAchievement.progress || {};
+  const t = goalAchievement.trend || {};
+  const b = goalAchievement.behavioralContext || null;
+
+  // Outlook Badge Class & Label
+  let outlookBadgeClass = 'ontrack';
+  if (o.status === 'achieved') outlookBadgeClass = 'ahead';
+  else if (o.status === 'on_track' || o.status === 'stable') outlookBadgeClass = 'ontrack';
+  else if (o.status === 'slow_progress') outlookBadgeClass = 'warning-gold';
+  else if (o.status === 'at_risk' || o.status === 'drifting_up' || o.status === 'drifting_down') outlookBadgeClass = 'behind';
+  else if (o.status === 'moving_away' || o.status === 'above_zone' || o.status === 'below_zone') outlookBadgeClass = 'behind';
+
+  const outlookBadge = `<span class="badge-status-${outlookBadgeClass}" style="padding: 3px 10px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;">${escapeHtml(o.title || o.status || 'Outlook')}</span>`;
+
+  // Confidence Badge Class
+  const confClass = c.level === 'high' ? 'ahead' : (c.level === 'moderate' ? 'ontrack' : 'insufficient');
+  const confBadge = `<span class="badge-status-${confClass}" style="padding: 2px 8px; font-size: 10px; font-weight: 700; text-transform: capitalize;">${escapeHtml(c.level || 'Moderate')} Confidence</span>`;
+
+  // Goal type descriptor
+  const goalTypeFormatted = g.type ? (g.type === 'weight_loss' ? 'Weight-loss goal' : (g.type === 'muscle_gain' ? 'Muscle-gain goal' : 'Maintenance goal')) : 'Active goal';
+
+  // Completion Time String
+  let completionStr = 'N/A';
+  if (o.status === 'achieved') {
+    completionStr = '<span style="color: var(--success); font-weight: 700;">Target Achieved!</span>';
+  } else if (f.estimatedWeeksRemaining !== null && f.estimatedCompletionDate) {
+    completionStr = `~${f.estimatedWeeksRemaining} weeks <span style="font-size: 11.5px; color: var(--text-secondary); font-weight: 400;">(${formatDate(f.estimatedCompletionDate)})</span>`;
+  } else if (g.type === 'maintenance') {
+    completionStr = '<span style="color: var(--text-secondary); font-size: 12px;">Ongoing zone maintenance</span>';
+  } else if (o.status === 'at_risk') {
+    completionStr = '<span style="color: #F59E0B; font-size: 12px;">Stalled (insufficient trend)</span>';
+  } else if (o.status === 'moving_away') {
+    completionStr = '<span style="color: var(--danger); font-size: 12px;">Moving away from target</span>';
+  }
+
+  return `
+    <div class="analytics-card goal-achievement-card">
+      <div class="achievement-header-row">
+        <div class="achievement-title-area">
+          <i class="fas fa-bullseye" style="color:var(--primary);"></i>
+          <h3>Goal Achievement</h3>
+          <span class="achievement-type-tag">${goalTypeFormatted}</span>
+        </div>
+        ${outlookBadge}
+      </div>
+
+      <div class="metrics-panel-stack" style="gap:10px; margin-top: 14px;">
+        <div class="insight-stat-row">
+          <span class="label">Current Weight</span>
+          <span class="val highlight">${g.currentWeight != null ? g.currentWeight + ' kg' : 'N/A'}</span>
+        </div>
+        <div class="insight-stat-row">
+          <span class="label">Target Weight</span>
+          <span class="val" style="color:var(--accent-green);">${g.targetWeight != null ? g.targetWeight + ' kg' : 'N/A'}</span>
+        </div>
+        <div class="insight-stat-row">
+          <span class="label">${g.type === 'maintenance' ? 'Zone Deviation' : 'Remaining Distance'}</span>
+          <span class="val">${g.remainingKg != null ? g.remainingKg + ' kg' : '0 kg'}</span>
+        </div>
+        <div class="insight-stat-row">
+          <span class="label">Observed Velocity</span>
+          <span class="val">${escapeHtml(t.label || (t.slopeKgPerWeek != null ? t.slopeKgPerWeek + ' kg/week' : 'N/A'))}</span>
+        </div>
+        <div class="insight-stat-row">
+          <span class="label">Estimated Completion</span>
+          <span class="val" style="display: flex; align-items: center; gap: 6px;">${completionStr}</span>
+        </div>
+        <div class="insight-stat-row">
+          <span class="label">Prediction Confidence</span>
+          <span class="val">${confBadge}</span>
+        </div>
+      </div>
+
+      <div class="analytics-progress-wrapper" style="margin-top: 16px;">
+        <div class="analytics-progress-label">
+          <span>Overall Goal Progress</span>
+          <span style="font-weight:700;color:var(--primary-teal);">${p.percentage != null ? p.percentage : 0}%</span>
+        </div>
+        <div class="analytics-progress-bg">
+          <div class="analytics-progress-fill" style="width:${p.percentage != null ? p.percentage : 0}%;"></div>
+        </div>
+      </div>
+
+      <!-- Trajectory Outlook Explanation Box -->
+      <div class="achievement-guidance-box" style="margin-top: 16px;">
+        <i class="fas fa-compass" style="color:var(--primary); font-size: 15px; margin-top: 2px;"></i>
+        <div>
+          <p style="margin: 0; line-height: 1.5; font-size: 13px; color: var(--text-primary); font-weight: 500;">
+            ${escapeHtml(o.explanation || '')}
+          </p>
+          ${b && b.note ? `<p style="margin: 6px 0 0; line-height: 1.45; font-size: 12px; color: var(--text-secondary);">${escapeHtml(b.note)}</p>` : ''}
+          ${c && c.reason ? `<div style="margin-top: 6px; font-size: 11px; color: rgba(255,255,255,0.4);">${escapeHtml(c.reason)}</div>` : ''}
+        </div>
+      </div>
+
+      <div class="achievement-disclaimer">
+        Personalized trajectory prediction based on your logged history — not a clinical medical model.
+      </div>
+    </div>`;
+}
+
 // ─── Analytics: Render (Phase 4) ────────────────────────────────────
-function renderAnalyticsView(data) {
+function renderAnalyticsView(data, progressSignals, goalAchievement, personalizedRec = null) {
   const container = document.getElementById('analytics-main-area');
   const badgeContainer = document.getElementById('analytics-status-badge-container');
   if (!container) return;
@@ -1074,7 +1426,7 @@ function renderAnalyticsView(data) {
           </div>
         </div>
 
-        <!-- Card 2: Timeline & Forecast Projections -->
+        <!-- Card 2: Timeline & Forecast Projections (Capability 1) -->
         <div class="analytics-card">
           <h3>Goal Completion Forecast</h3>
           <div class="metrics-panel-stack" style="gap:10px;">
@@ -1099,6 +1451,9 @@ function renderAnalyticsView(data) {
             </div>
           </div>
         </div>
+
+        <!-- Card 3: Goal Achievement Prediction (Capability 2) -->
+        ${renderGoalAchievementCard(goalAchievement)}
       </div>
 
       <!-- Column B: Interactive Weight Chart & Weekly Velocity Insights -->
@@ -1116,6 +1471,8 @@ function renderAnalyticsView(data) {
               <p style="margin: 0; line-height: 1.5; font-size: 13px;">${escapeHtml(data.forecast.insights)}</p>
             </div>
           </div>
+          ${renderProgressSignalNote(progressSignals)}
+          ${renderAnalyticsRecPreview(personalizedRec)}
         </div>
       </div>
     </div>
@@ -1277,7 +1634,7 @@ async function loadCheckin() {
   try {
     // 1. Fetch today's check-in & streaks
     const response = await fetch('/api/checkin/today').then(r => r.json());
-    
+
     // 2. Fetch goals to get active goal info
     const goalsRes = await fetch('/api/goals').then(r => r.json());
     const activeGoal = goalsRes.success && goalsRes.goals ? goalsRes.goals.find(g => g.status === 'active') : null;
@@ -1498,9 +1855,9 @@ function adjustWater(val) {
 function selectEnergyLevel(level) {
   const input = document.getElementById('checkin-energy-val');
   if (!input) return;
-  
+
   input.value = level;
-  
+
   // Update UI selection classes
   document.querySelectorAll('.energy-selector-grid .energy-btn').forEach(btn => {
     btn.classList.toggle('selected', parseInt(btn.dataset.level, 10) === level);
@@ -1511,7 +1868,7 @@ function toggleWorkoutDuration() {
   const checkbox = document.getElementById('checkin-workout-completed');
   const wrapper = document.getElementById('checkin-workout-duration-wrapper');
   if (!checkbox || !wrapper) return;
-  
+
   wrapper.style.display = checkbox.checked ? 'block' : 'none';
 }
 
@@ -1556,7 +1913,7 @@ async function saveCheckin(e) {
     const result = await apiPost('/api/checkin', payload);
     if (result.success) {
       showToast('Daily check-in saved ✓');
-      
+
       // Reload relevant data stores
       loadGoals();
       loadJourney();
@@ -1694,19 +2051,19 @@ function renderHealthScoreView(data) {
           
           <div class="metrics-panel-stack" style="gap: 16px;">
             ${Object.entries(breakdown).map(([key, item]) => {
-              const compTitles = {
-                goalProgress: { title: 'Goal Progress', icon: 'fa-bullseye' },
-                dailyActivity: { title: 'Daily Activity', icon: 'fa-running' },
-                workoutConsistency: { title: 'Workout Consistency', icon: 'fa-calendar-check' },
-                hydration: { title: 'Daily Hydration', icon: 'fa-tint' },
-                energyLevels: { title: 'Energy Levels', icon: 'fa-bolt' },
-                checkinStreaks: { title: 'Check-In Streaks', icon: 'fa-fire' }
-              }[key] || { title: key, icon: 'fa-question' };
+    const compTitles = {
+      goalProgress: { title: 'Goal Progress', icon: 'fa-bullseye' },
+      dailyActivity: { title: 'Daily Activity', icon: 'fa-running' },
+      workoutConsistency: { title: 'Workout Consistency', icon: 'fa-calendar-check' },
+      hydration: { title: 'Daily Hydration', icon: 'fa-tint' },
+      energyLevels: { title: 'Energy Levels', icon: 'fa-bolt' },
+      checkinStreaks: { title: 'Check-In Streaks', icon: 'fa-fire' }
+    }[key] || { title: key, icon: 'fa-question' };
 
-              const scoreVal = item.score;
-              const statusColor = scoreVal >= 80 ? 'var(--success)' : (scoreVal >= 60 ? 'var(--warning)' : 'var(--danger)');
+    const scoreVal = item.score;
+    const statusColor = scoreVal >= 80 ? 'var(--success)' : (scoreVal >= 60 ? 'var(--warning)' : 'var(--danger)');
 
-              return `
+    return `
                 <details class="score-breakdown-details">
                   <summary class="breakdown-summary">
                     <span class="breakdown-summary-left">
@@ -1737,7 +2094,7 @@ function renderHealthScoreView(data) {
                   </div>
                 </details>
               `;
-            }).join('')}
+  }).join('')}
           </div>
         </div>
       </div>
@@ -1750,7 +2107,7 @@ function renderHealthScoreView(data) {
     if (circle) {
       circle.style.strokeDashoffset = strokeDashoffset;
     }
-    
+
     // Animate the text counter in the center
     const numVal = document.getElementById('healthscore-number-val');
     if (numVal) {
@@ -1938,13 +2295,13 @@ function showCoachAnswer(key, btn) {
   };
 
   title.textContent = questionTitles[key] || '';
-  
+
   // Format markdown-like bold strings
   let rawText = window.coachAnswersData[key] || 'No analysis available.';
   let formatted = rawText.replace(/\*\*(.*?)\*\*/g, '<strong style="color:#fff;">$1</strong>');
-  
+
   text.innerHTML = formatted;
-  
+
   // Slide down or fade in
   display.style.display = 'block';
   display.style.opacity = '0';
@@ -1955,7 +2312,7 @@ function showCoachAnswer(key, btn) {
 }
 
 
-// ─── Recommendations: Load Data (Phase 7) ───────────────────────────
+// ─── Recommendations: Load Data (Phase 7 & Capability 4) ───────────
 async function loadRecommendations() {
   const container = document.getElementById('recommendations-main-area');
   const badgeContainer = document.getElementById('recommendations-summary-badge');
@@ -1964,16 +2321,20 @@ async function loadRecommendations() {
   container.innerHTML = `
     <div class="loading-container" style="padding: 40px; text-align: center;">
       <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: rgba(255,255,255,0.4);"></i>
-      <p style="margin-top: 10px; color: rgba(255,255,255,0.4); font-size: 13px;">Analyzing your health data...</p>
+      <p style="margin-top: 10px; color: rgba(255,255,255,0.4); font-size: 13px;">Analyzing your health data & personal trajectory...</p>
     </div>
   `;
 
   try {
-    const response = await fetch('/api/recommendations').then(r => r.json());
-    if (response.success) {
-      renderRecommendationsView(response);
+    const [recResponse, personalizedResponse] = await Promise.all([
+      fetch('/api/recommendations').then(r => r.json()),
+      fetch('/api/recommendations/personalized').then(r => r.json()).catch(() => null)
+    ]);
+
+    if (recResponse.success) {
+      renderRecommendationsView(recResponse, personalizedResponse);
     } else {
-      container.innerHTML = `<p class="msg error" style="margin: 20px;">Error loading recommendations: ${escapeHtml(response.message)}</p>`;
+      container.innerHTML = `<p class="msg error" style="margin: 20px;">Error loading recommendations: ${escapeHtml(recResponse.message)}</p>`;
     }
   } catch (err) {
     console.error(err);
@@ -1981,14 +2342,140 @@ async function loadRecommendations() {
   }
 }
 
-function renderRecommendationsView(data) {
+// ─── Capability 4: Personalized Recommendation Hero Renderer ──────
+function renderPersonalizedRecommendationHero(personalizedRec) {
+  if (!personalizedRec) return '';
+
+  if (personalizedRec.status === 'no_active_goal') {
+    return `
+      <div class="glass-card personalized-rec-hero no-goal">
+        <div class="p-rec-header">
+          <span class="p-rec-chip"><i class="fas fa-compass"></i> CAPABILITY 4 — PERSONALIZED FOCUS</span>
+          <span class="prio-badge badge-medium">GOAL NEEDED</span>
+        </div>
+        <h3 class="p-rec-title">Set an active goal to unlock tailored trajectory recommendations</h3>
+        <p class="p-rec-action"><i class="fas fa-bullseye"></i> Create your target weight and timeframe in Goals to receive personalized guidance.</p>
+        <div class="p-rec-reason-box">
+          <span class="p-rec-reason-label"><i class="fas fa-circle-question"></i> Why am I seeing this?</span>
+          <p class="p-rec-reason-text">Personalized recommendations synthesize your trajectory, goal outlook, and signals. Setting an active goal allows the intelligence pipeline to align suggestions with your target direction.</p>
+        </div>
+        <div style="margin-top: 14px;">
+          <button class="btn-main" style="width: auto; padding: 10px 22px; font-size: 13px;" onclick="switchSection('goals', document.querySelector('.nav-tab[onclick*=\\'goals\\']'))">
+            <i class="fas fa-plus"></i>&nbsp; Set Active Goal
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  const p = personalizedRec.primary;
+  if (!p) return '';
+
+  const isInsufficient = personalizedRec.status === 'insufficient_data';
+  const priority = p.priority || 'medium';
+  const prioLabel = priority.toUpperCase();
+  const ctx = personalizedRec.context || {};
+
+  const goalTypeLabels = {
+    weight_loss: 'Weight Loss',
+    muscle_gain: 'Muscle Gain',
+    maintenance: 'Maintenance'
+  };
+  const goalTypeStr = goalTypeLabels[ctx.goalType] || ctx.goalType || 'Active';
+
+  const achievementLabels = {
+    on_track: 'On Track',
+    slow_progress: 'Slow Progress',
+    at_risk: 'At Risk',
+    moving_away: 'Moving Away',
+    achieved: 'Achieved',
+    insufficient_data: 'Evaluating'
+  };
+  const achievementStr = achievementLabels[ctx.achievementStatus] || ctx.achievementStatus || 'Evaluating';
+
+  const signalLabels = {
+    point_anomaly: 'Scale Fluctuation',
+    reversal: 'Trend Reversal',
+    plateau: 'Plateau',
+    behavior_drop: 'Activity Drop',
+    stable: 'Stable Trend',
+    drift: 'Trend Drift',
+    insufficient: 'Establishing Baseline',
+    none: 'Normal'
+  };
+  const signalStr = signalLabels[ctx.progressSignal] || ctx.progressSignal || 'Active';
+
+  const supportingActions = Array.isArray(personalizedRec.supporting) ? personalizedRec.supporting : [];
+
+  return `
+    <div class="glass-card personalized-rec-hero priority-${priority}">
+      <div class="p-rec-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="p-rec-chip"><i class="fas fa-compass"></i> CAPABILITY 4 — PERSONALIZED FOCUS</span>
+          <span class="prio-badge badge-${priority}">${prioLabel} PRIORITY</span>
+        </div>
+        <div class="p-rec-context-pills">
+          <span class="p-rec-pill"><i class="fas fa-bullseye"></i> Goal: ${escapeHtml(goalTypeStr)}</span>
+          <span class="p-rec-pill"><i class="fas fa-chart-line"></i> Outlook: ${escapeHtml(achievementStr)}</span>
+          <span class="p-rec-pill"><i class="fas fa-satellite-dish"></i> Signal: ${escapeHtml(signalStr)}</span>
+        </div>
+      </div>
+
+      <div class="p-rec-body">
+        <h3 class="p-rec-title">${escapeHtml(p.title)}</h3>
+        <div class="p-rec-action-callout">
+          <div class="p-rec-action-icon"><i class="fas fa-arrow-right"></i></div>
+          <div class="p-rec-action-content">
+            <span class="p-rec-action-label">Recommended Action</span>
+            <p class="p-rec-action-text">${escapeHtml(p.action)}</p>
+          </div>
+        </div>
+
+        <div class="p-rec-reason-box">
+          <span class="p-rec-reason-label"><i class="fas fa-circle-question"></i> Why am I seeing this recommendation?</span>
+          <p class="p-rec-reason-text">${escapeHtml(p.reason)}</p>
+        </div>
+
+        ${supportingActions.length > 0 ? `
+          <div class="p-rec-supporting-section">
+            <h4 class="p-rec-supporting-title"><i class="fas fa-list-check"></i> Supporting Actions</h4>
+            <div class="p-rec-supporting-grid">
+              ${supportingActions.map(s => `
+                <div class="p-rec-supporting-card">
+                  <span class="p-rec-supporting-head">${escapeHtml(s.title)}</span>
+                  <p class="p-rec-supporting-action">${escapeHtml(s.action)}</p>
+                  <span class="p-rec-supporting-reason">${escapeHtml(s.reason)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        ${isInsufficient ? `
+          <div style="margin-top: 14px;">
+            <button class="btn-main" style="width: auto; padding: 10px 22px; font-size: 13px;" onclick="switchSection('checkin', document.querySelector('.nav-tab[onclick*=\\'checkin\\']'))">
+              <i class="fas fa-plus-circle"></i>&nbsp; Log Daily Check-in
+            </button>
+          </div>
+        ` : ''}
+
+        <div class="p-rec-disclaimer">
+          <i class="fas fa-shield-heart"></i>
+          <span>${escapeHtml(personalizedRec.disclaimer || 'Recommendations are wellness suggestions based on your logged telemetry trends and are not medical advice.')}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderRecommendationsView(data, personalizedRec = null) {
   const container = document.getElementById('recommendations-main-area');
   const badgeContainer = document.getElementById('recommendations-summary-badge');
   if (!container || !badgeContainer) return;
 
   const score = data.healthScore;
   const list = data.recommendations || [];
-  
+
   const totalCount = list.length;
   const highCount = list.filter(r => r.priority === 'high').length;
 
@@ -2001,23 +2488,14 @@ function renderRecommendationsView(data) {
   badgeContainer.innerHTML = `
     <span class="rating-badge ${scoreClass}" style="padding: 4px 12px; font-weight: 700; font-size: 13px; border-radius: 20px;">Score: ${score}</span>
     <span style="font-size: 13px; background: rgba(255,255,255,0.06); padding: 4px 12px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.85);">
-      Total: <strong>${totalCount}</strong>
+      Telemetry Items: <strong>${totalCount}</strong>
     </span>
     <span style="font-size: 13px; background: ${highCount > 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255,255,255,0.06)'}; color: ${highCount > 0 ? '#ef4444' : 'rgba(255,255,255,0.85)'}; padding: 4px 12px; border-radius: 20px; border: 1px solid ${highCount > 0 ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255,255,255,0.1)'};">
       High Priority: <strong>${highCount}</strong>
     </span>
   `;
 
-  if (totalCount === 0) {
-    container.innerHTML = `
-      <div style="text-align: center; padding: 40px; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px;">
-        <i class="fas fa-check-circle" style="font-size: 32px; color: var(--accent-green); margin-bottom: 12px;"></i>
-        <p style="margin: 0; font-size: 15px; color: rgba(255,255,255,0.85);">No recommendations at this time.</p>
-        <p style="margin: 8px 0 0 0; font-size: 12.5px; color: rgba(255,255,255,0.45);">Your health scores and progress check-ins are fully optimized!</p>
-      </div>
-    `;
-    return;
-  }
+  const heroHtml = renderPersonalizedRecommendationHero(personalizedRec);
 
   const categoryLabels = {
     goal_progress: 'Goal Progress',
@@ -2033,14 +2511,19 @@ function renderRecommendationsView(data) {
     low: 'LOW'
   };
 
-  container.innerHTML = `
+  const gridHtml = totalCount === 0 ? `
+    <div style="text-align: center; padding: 30px; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px;">
+      <i class="fas fa-check-circle" style="font-size: 28px; color: var(--accent-green); margin-bottom: 10px;"></i>
+      <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.85);">All telemetry metrics are currently optimized!</p>
+    </div>
+  ` : `
     <div class="recommendations-grid">
       ${list.map(rec => {
-        const catLabel = categoryLabels[rec.category] || rec.category;
-        const prioLabel = priorityLabels[rec.priority] || rec.priority;
-        const iconClass = getCategoryIcon(rec.category);
-        const scoreImpact = getHealthScoreImpact(rec.category, rec.priority);
-        return `
+    const catLabel = categoryLabels[rec.category] || rec.category;
+    const prioLabel = priorityLabels[rec.priority] || rec.priority;
+    const iconClass = getCategoryIcon(rec.category);
+    const scoreImpact = getHealthScoreImpact(rec.category, rec.priority);
+    return `
           <div class="glass-card recommendation-card priority-${rec.priority}">
             <div>
               <div class="rec-card-header">
@@ -2062,8 +2545,23 @@ function renderRecommendationsView(data) {
             </div>
           </div>
         `;
-      }).join('')}
+  }).join('')}
     </div>
+  `;
+
+  container.innerHTML = `
+    ${heroHtml}
+    <div class="rec-telemetry-header" style="margin: 32px 0 16px 0; display: flex; align-items: center; justify-content: space-between;">
+      <div>
+        <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
+          <i class="fas fa-layer-group" style="color: var(--primary-teal);"></i> Category Telemetry Recommendations
+        </h3>
+        <p style="margin: 4px 0 0 0; font-size: 12.5px; color: rgba(255,255,255,0.5);">
+          Telemetry and check-in score optimizations across activity, hydration, recovery, and consistency.
+        </p>
+      </div>
+    </div>
+    ${gridHtml}
   `;
 }
 
@@ -2091,400 +2589,644 @@ function getCategoryIcon(category) {
   return icons[category] || 'fa-lightbulb';
 }
 
-// ─── Dashboard Home: Load Data (Phase 9) ──────────────────────────────
+// ─── Dashboard Home: Load Data (Phase 3 Redesign) ─────────────────────
+function renderDashboardSparkline(weightHistory) {
+  if (!weightHistory || weightHistory.length < 2) {
+    return `
+      <div style="height: 74px; display: flex; align-items: center; justify-content: center; background: rgba(9, 12, 19, 0.4); border-radius: 12px; border: 1px dashed rgba(255, 255, 255, 0.08);">
+        <span style="font-size: 11.5px; color: #71717A;">Trajectory curve activates with 2+ weigh-ins</span>
+      </div>
+    `;
+  }
+
+  const points = weightHistory.slice(-10);
+  const weights = points.map(p => p.weight);
+  const minW = Math.min(...weights);
+  const maxW = Math.max(...weights);
+  const range = maxW - minW || 1;
+  const padY = 10;
+  const w = 360;
+  const h = 74;
+
+  const coords = points.map((p, i) => {
+    const x = (i / (points.length - 1)) * (w - 24) + 12;
+    const y = h - padY - ((p.weight - minW) / range) * (h - padY * 2);
+    return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, weight: p.weight };
+  });
+
+  let pathD = `M ${coords[0].x} ${coords[0].y}`;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p0 = coords[i];
+    const p1 = coords[i + 1];
+    const cpX = (p0.x + p1.x) / 2;
+    pathD += ` C ${cpX} ${p0.y}, ${cpX} ${p1.y}, ${p1.x} ${p1.y}`;
+  }
+
+  const lastPt = coords[coords.length - 1];
+  const areaD = `${pathD} L ${lastPt.x} ${h} L ${coords[0].x} ${h} Z`;
+
+  return `
+    <svg class="dash-sparkline-canvas" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="dashSparkGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#00D2FF" stop-opacity="0.28"/>
+          <stop offset="100%" stop-color="#00D2FF" stop-opacity="0.0"/>
+        </linearGradient>
+      </defs>
+      <path d="${areaD}" fill="url(#dashSparkGrad)" />
+      <path d="${pathD}" fill="none" stroke="#00D2FF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+      <circle cx="${lastPt.x}" cy="${lastPt.y}" r="4" fill="#00F5A0" stroke="#06090F" stroke-width="2" />
+    </svg>
+  `;
+}
+
 async function loadDashboardHome() {
   const container = document.getElementById('dashboard-main-area');
   if (!container) return;
 
   container.innerHTML = `
-    <div class="loading-container" style="padding: 40px; text-align: center;">
-      <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: rgba(255,255,255,0.4);"></i>
-      <p style="margin-top: 10px; color: rgba(255,255,255,0.4); font-size: 13px;">Assembling your dashboard statistics...</p>
+    <div class="loading-container" style="padding: 48px; text-align: center;">
+      <i class="fas fa-circle-notch fa-spin" style="font-size: 26px; color: #00D2FF;"></i>
+      <p style="margin-top: 14px; color: #A1A1AA; font-size: 13.5px; letter-spacing: 0.2px;">
+        Synchronizing physiological telemetry...
+      </p>
     </div>
   `;
 
-  // Set the dashboard date
+  // Set formatted current date in date badge
   const dateBadge = document.getElementById('dashboard-date');
   if (dateBadge) {
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    const options = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
     dateBadge.textContent = new Date().toLocaleDateString('en-US', options);
   }
 
   try {
-    const [scoreData, recData, coachData, checkinToday] = await Promise.all([
-      fetch('/api/healthscore').then(r => r.json()),
-      fetch('/api/recommendations').then(r => r.json()),
-      fetch('/api/coach').then(r => r.json()),
-      fetch('/api/checkin/today').then(r => r.json())
+    const [scoreData, goalsData, signalsData, analyticsData, checkinToday, recData, coachData] = await Promise.all([
+      fetch('/api/healthscore').then(r => r.json()).catch(() => ({ success: false })),
+      fetch('/api/goals').then(r => r.json()).catch(() => ({ success: false })),
+      fetch('/api/progress/signals').then(r => r.json()).catch(() => ({ success: false })),
+      fetch('/api/progress/analytics').then(r => r.json()).catch(() => ({ success: false })),
+      fetch('/api/checkin/today').then(r => r.json()).catch(() => ({ success: false })),
+      fetch('/api/recommendations').then(r => r.json()).catch(() => ({ success: false })),
+      fetch('/api/coach').then(r => r.json()).catch(() => ({ success: false }))
     ]);
 
-    if (!scoreData.success || !recData.success || !coachData.success || !checkinToday.success) {
-      container.innerHTML = `<p class="msg error" style="margin: 20px;">Error loading dashboard data. Please try again.</p>`;
-      return;
-    }
-
-    const score = scoreData.healthScore;
-    const rating = scoreData.rating;
-    const recCount = recData.recommendations ? recData.recommendations.length : 0;
-
-    // Get active goal progress
-    let progressText = 'No Active Goal';
-    let progressPct = 0;
-    
-    const goalComp = scoreData.breakdown ? scoreData.breakdown.goalProgress : null;
-    if (goalComp) {
-      progressText = goalComp.value || 'No Active Goal';
-      progressPct = goalComp.score || 0;
-    }
-
-    // Set Welcome Header with user name and dynamic greeting
+    // 1. GREETING & HEADER
     const welcomeTitle = document.getElementById('welcome-title');
     const welcomeSubtitle = document.getElementById('welcome-subtitle');
+    const username = (document.getElementById('p-name') && document.getElementById('p-name').textContent.trim()) || 'Athlete';
+
+    const hours = new Date().getHours();
+    let greeting = 'Good evening';
+    if (hours >= 5 && hours < 12) greeting = 'Good morning';
+    else if (hours >= 12 && hours < 17) greeting = 'Good afternoon';
+
     if (welcomeTitle) {
-      const username = (document.getElementById('p-name') && document.getElementById('p-name').textContent.trim()) || 'User';
-      const hours = new Date().getHours();
-      let greeting = 'Good evening';
-      if (hours >= 5 && hours < 12) {
-        greeting = 'Good morning';
-      } else if (hours >= 12 && hours < 17) {
-        greeting = 'Good afternoon';
-      }
-      welcomeTitle.textContent = `${greeting}, ${username}!`;
+      welcomeTitle.textContent = `${greeting}, ${username}`;
     }
     if (welcomeSubtitle) {
-      const options = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' };
-      const formattedDate = new Date().toLocaleDateString('en-US', options);
-      welcomeSubtitle.textContent = `Today is ${formattedDate}. Here is your health overview.`;
+      welcomeSubtitle.textContent = `Your health state & biometric momentum at a glance.`;
     }
 
-    // Rating Color classes
-    const ratingClass = rating.toLowerCase().replace(' ', '-');
+    // 2. HEALTH STATE — PRIMARY HERO
+    const score = (scoreData.success && typeof scoreData.healthScore === 'number') ? scoreData.healthScore : 0;
+    const rating = (scoreData.success && scoreData.rating) ? scoreData.rating : 'Calibrating';
+    const ratingClass = rating.toLowerCase().replace(/\s+/g, '-');
+    const breakdown = (scoreData.success && scoreData.breakdown) ? scoreData.breakdown : {};
 
-    // Resolve current check-in streak
-    let streakText = '0 Days';
-    const streakComp = scoreData.breakdown ? scoreData.breakdown.checkinStreaks : null;
-    if (streakComp && streakComp.value) {
-      streakText = streakComp.value;
+    // Determine gauge color
+    let gaugeColor = '#00D2FF';
+    if (score >= 90) gaugeColor = '#A78BFA';
+    else if (score >= 80) gaugeColor = '#00D2FF';
+    else if (score >= 70) gaugeColor = '#00F5A0';
+    else if (score >= 60) gaugeColor = '#FBBF24';
+    else if (score > 0) gaugeColor = '#F87171';
+
+    const circ = 2 * Math.PI * 54; // ~339.29
+    const strokeOffset = Math.max(0, Math.min(circ, circ * (1 - (score / 100))));
+
+    // Driver narrative
+    let driverText = 'Consistent tracking across activity and hydration maintains your score baseline.';
+    if (breakdown.checkinStreaks && breakdown.checkinStreaks.score >= 18) {
+      driverText = `Consistency is a top positive driver (+${breakdown.checkinStreaks.score} pts). Protecting daily check-in streak compounds momentum.`;
+    } else if (breakdown.hydration && breakdown.hydration.score < 8) {
+      driverText = 'Hydration deficit is currently holding your score below potential. Prioritize water intake today.';
+    } else if (breakdown.goalProgress && breakdown.goalProgress.score >= 18) {
+      driverText = 'Goal alignment is exceptional. Target trajectory velocity is well within planned parameters.';
     }
 
-    // Resolve today's checkin metrics
-    let stepsDisplay = 'Not logged';
-    let hydrationDisplay = 'Not logged';
-    let workoutDisplay = 'Not logged';
-    let energyDisplay = 'Not logged';
+    // 3. GOAL PROGRESS
+    const activeGoal = (goalsData.success && goalsData.goals)
+      ? goalsData.goals.find(g => g.status === 'active')
+      : null;
 
-    if (checkinToday.logged && checkinToday.data) {
-      const data = checkinToday.data;
-      if (data.steps_count !== null) {
-        stepsDisplay = `${data.steps_count.toLocaleString()} steps`;
-      } else {
-        stepsDisplay = '0 steps';
+    let goalHeroHtml = '';
+    if (activeGoal) {
+      const sw = parseFloat(activeGoal.start_weight);
+      const tw = parseFloat(activeGoal.target_weight);
+      const cw = activeGoal.current_weight !== undefined && activeGoal.current_weight !== null
+        ? parseFloat(activeGoal.current_weight)
+        : sw;
+      const progressPct = Math.max(0, Math.min(100, Math.round(activeGoal.progress_pct || 0)));
+      const remainingKg = Math.abs(cw - tw).toFixed(1);
+
+      let targetDateText = 'No target date set';
+      let daysRemainingText = '';
+      if (activeGoal.target_date) {
+        const tDate = new Date(activeGoal.target_date);
+        targetDateText = tDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const diffDays = Math.ceil((tDate - new Date()) / (1000 * 60 * 60 * 24));
+        if (diffDays >= 0) daysRemainingText = `${diffDays} days left`;
+        else daysRemainingText = `${Math.abs(diffDays)}d past target`;
       }
 
-      if (data.water_intake_l !== null) {
-        hydrationDisplay = `${data.water_intake_l.toFixed(1)} L`;
-      } else {
-        hydrationDisplay = '0.0 L';
-      }
-
-      if (data.workout_completed) {
-        workoutDisplay = `Completed (${data.workout_duration_mins || 0}m)`;
-      } else {
-        workoutDisplay = 'Rest day';
-      }
-
-      if (data.energy_level !== null) {
-        energyDisplay = `${data.energy_level} / 10`;
-      } else {
-        energyDisplay = '5 / 10';
-      }
-    }
-
-    // Resolve AI Coach Mood
-    let moodText = 'Stable';
-    let moodColorBg = 'rgba(59, 130, 246, 0.1)';
-    let moodColorText = 'var(--primary)';
-    let moodBorderColor = 'rgba(59, 130, 246, 0.2)';
-
-    if (score >= 90) {
-      moodText = 'Peak Performance 🌟';
-      moodColorBg = 'rgba(34, 197, 94, 0.15)';
-      moodColorText = 'var(--success)';
-      moodBorderColor = 'rgba(34, 197, 94, 0.3)';
-    } else if (score >= 80) {
-      moodText = 'Solid Progress 👍';
-      moodColorBg = 'rgba(59, 130, 246, 0.15)';
-      moodColorText = 'var(--primary)';
-      moodBorderColor = 'rgba(59, 130, 246, 0.3)';
-    } else if (score >= 70) {
-      moodText = 'Healthy & Stable ⚖️';
-      moodColorBg = 'rgba(59, 130, 246, 0.1)';
-      moodColorText = 'rgba(255, 255, 255, 0.8)';
-      moodBorderColor = 'rgba(255, 255, 255, 0.15)';
-    } else if (score >= 60) {
-      moodText = 'Average Pace ⚠️';
-      moodColorBg = 'rgba(245, 158, 11, 0.15)';
-      moodColorText = 'var(--warning)';
-      moodBorderColor = 'rgba(245, 158, 11, 0.3)';
-    } else {
-      moodText = 'Action Required 🚨';
-      moodColorBg = 'rgba(239, 68, 68, 0.15)';
-      moodColorText = 'var(--danger)';
-      moodBorderColor = 'rgba(239, 68, 68, 0.3)';
-    }
-
-    // Resolve Priority Focus recommendation
-    let priorityFocusHtml = '';
-    const recs = recData.recommendations || [];
-    if (recs.length > 0) {
-      const prioOrder = { high: 1, medium: 2, low: 3 };
-      const sortedRecs = [...recs].sort((a, b) => {
-        const pA = prioOrder[a.priority] || 4;
-        const pB = prioOrder[b.priority] || 4;
-        return pA - pB;
-      });
-      const topRec = sortedRecs[0];
-      
-      const prioLabels = { high: 'HIGH', medium: 'MEDIUM', low: 'LOW' };
-      const categoryLabels = {
-        goal_progress: 'Goal Progress',
-        activity: 'Activity',
-        hydration: 'Hydration',
-        recovery: 'Recovery',
-        consistency: 'Consistency'
+      const goalTypeMap = {
+        weight_loss: 'Weight Loss',
+        muscle_gain: 'Muscle Gain',
+        maintenance: 'Maintenance'
       };
-      
-      const categoryIcons = {
-        goal_progress: 'fa-bullseye',
-        activity: 'fa-running',
-        hydration: 'fa-tint',
-        recovery: 'fa-bed',
-        consistency: 'fa-calendar-check'
-      };
+      const goalTypeLabel = goalTypeMap[activeGoal.goal_type] || 'Target Route';
 
-      const topPrio = topRec.priority || 'low';
-      const topPrioLabel = prioLabels[topPrio] || topPrio.toUpperCase();
-      const topCatLabel = categoryLabels[topRec.category] || topRec.category;
-      const topIcon = categoryIcons[topRec.category] || 'fa-lightbulb';
-      const topBenefit = topRec.expectedBenefit || 'N/A';
-      const topImpact = getHealthScoreImpact(topRec.category, topRec.priority);
+      goalHeroHtml = `
+        <div class="dash-card" onclick="switchSection('goals', document.querySelector('.dropdown-item[onclick*=\\'goals\\']'))" style="cursor: pointer;">
+          <div class="dash-card-header">
+            <h3 class="dash-card-title"><i class="fas fa-bullseye"></i> Primary Goal</h3>
+            <span class="dash-tag">${escapeHtml(goalTypeLabel)}</span>
+          </div>
 
-      let prioBg = 'rgba(245, 158, 11, 0.15)';
-      let prioText = 'var(--warning)';
-      let prioBorder = 'rgba(245, 158, 11, 0.3)';
-      if (topPrio === 'high') {
-        prioBg = 'rgba(239, 68, 68, 0.15)';
-        prioText = 'var(--danger)';
-        prioBorder = 'rgba(239, 68, 68, 0.3)';
-      } else if (topPrio === 'low') {
-        prioBg = 'rgba(59, 130, 246, 0.15)';
-        prioText = 'var(--primary)';
-        prioBorder = 'rgba(59, 130, 246, 0.3)';
-      }
-
-      priorityFocusHtml = `
-        <div class="glass-card" style="padding: 24px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px;">
-          <div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-              <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
-                <i class="fas ${topIcon}" style="color: var(--primary);"></i> Priority Focus Area
-              </h3>
-              <span style="font-size: 10px; font-weight: 800; background: ${prioBg}; color: ${prioText}; padding: 4px 8px; border-radius: 4px; border: 1px solid ${prioBorder}; text-transform: uppercase;">
-                ${topPrioLabel}
+          <div class="dash-goal-hero">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <h4 class="dash-goal-name">${escapeHtml(activeGoal.name || `${goalTypeLabel} Route`)}</h4>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: #00F5A0;">
+                ${progressPct}% Completed
               </span>
             </div>
-            <div style="font-size: 11px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px;">
-              Category: ${topCatLabel}
-            </div>
-            <h4 style="margin: 0 0 8px 0; font-size: 15px; font-weight: 700; color: #fff; line-height: 1.3;">
-              ${escapeHtml(topRec.title)}
-            </h4>
-            <p style="margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-secondary);">
-              ${escapeHtml(topRec.description)}
-            </p>
-          </div>
-          <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-            <div>
-              <div style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 2px;">Expected Benefit</div>
-              <div style="font-size: 12px; font-weight: 600; color: #fff;">${escapeHtml(topBenefit)}</div>
-            </div>
-            <div style="text-align: right;">
-              <div style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 2px;">Score Impact</div>
-              <div style="font-size: 12px; font-weight: 600; color: var(--primary);">${topImpact}</div>
+
+            <!-- Biometric Trajectory Track -->
+            <div class="dash-trajectory-track">
+              <div class="dash-trajectory-stations">
+                <div class="dash-station station-start">
+                  <span class="dash-station-label">Start</span>
+                  <span class="dash-station-val">${sw.toFixed(1)} kg</span>
+                </div>
+                <div class="dash-station station-current">
+                  <span class="dash-station-label">Current</span>
+                  <span class="dash-station-val">${cw.toFixed(1)} kg</span>
+                </div>
+                <div class="dash-station station-target">
+                  <span class="dash-station-label">Target</span>
+                  <span class="dash-station-val">${tw.toFixed(1)} kg</span>
+                </div>
+              </div>
+
+              <div class="dash-progress-slider-wrap">
+                <div class="dash-progress-slider-fill" style="width: ${progressPct}%;">
+                  <div class="dash-progress-pin"></div>
+                </div>
+              </div>
+
+              <div class="dash-goal-meta-row">
+                <div class="dash-meta-item">
+                  <i class="fas fa-route"></i>
+                  <span>Distance:</span>
+                  <span class="dash-meta-val">${remainingKg} kg left</span>
+                </div>
+                <div class="dash-meta-item">
+                  <i class="fas fa-calendar-alt"></i>
+                  <span>Target:</span>
+                  <span class="dash-meta-val">${targetDateText} ${daysRemainingText ? `(${daysRemainingText})` : ''}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       `;
     } else {
-      priorityFocusHtml = `
-        <div class="glass-card" style="padding: 24px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 160px;">
-          <i class="fas fa-check-circle" style="font-size: 32px; color: var(--success); margin-bottom: 12px;"></i>
-          <h3 style="margin: 0 0 6px 0; font-size: 15px; font-weight: 700; color: #fff;">System Fully Optimized</h3>
-          <p style="margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-secondary);">
-            All check-ins, hydration, and goal progress are on track. No action items generated.
-          </p>
+      goalHeroHtml = `
+        <div class="dash-card">
+          <div class="dash-card-header">
+            <h3 class="dash-card-title"><i class="fas fa-bullseye"></i> Primary Goal</h3>
+            <span class="dash-tag">Standby</span>
+          </div>
+          <div class="dash-empty-goal">
+            <i class="fas fa-bullseye"></i>
+            <p>No active health goal defined yet. Setting a target weight activates precision telemetry, trajectory curves, and pace tracking.</p>
+            <button class="dash-btn-primary" onclick="openGoalModal()">
+              <i class="fas fa-plus"></i> Set Primary Goal
+            </button>
+          </div>
         </div>
       `;
     }
 
-    container.innerHTML = `
-      <!-- Quick Stats Row -->
-      <div class="stats-row">
-        <div class="stats-card" onclick="switchSection('healthscore', document.querySelector('.nav-tab[onclick*=\\'healthscore\\']'))">
-          <div class="stats-header">
-            <span class="label">Health Score</span>
-            <i class="fas fa-heartbeat" style="color: var(--primary);"></i>
+    // 4. "WHAT CHANGED?" INTELLIGENCE (Capability 3)
+    let intelClass = 'intel-steady';
+    let intelIcon = 'fa-compass';
+    let intelEyebrow = 'Progress Telemetry';
+    let intelStatus = 'Steady Pace';
+    let intelTitle = 'Physiological Trajectory is Steady';
+    let intelDesc = 'Recent weight measurements show consistent progress aligned with your target direction. Zero anomalies or plateau stalls flagged.';
+
+    const primarySignal = (signalsData.success && signalsData.primary) ? signalsData.primary : null;
+
+    if (primarySignal) {
+      if (primarySignal.type === 'plateau') {
+        intelClass = 'intel-plateau';
+        intelIcon = 'fa-pause-circle';
+        intelStatus = 'Plateau Flagged';
+        intelTitle = primarySignal.title || 'Weight Plateau Detected';
+        intelDesc = primarySignal.explanation || '14-day weight slope is near zero. This is a natural physiological adaptation. Focus on consistency and hydration.';
+      } else if (primarySignal.type === 'reversal') {
+        intelClass = 'intel-reversal';
+        intelIcon = 'fa-arrow-trend-up';
+        intelStatus = 'Direction Shift';
+        intelTitle = primarySignal.title || 'Pace Shift Flagged';
+        intelDesc = primarySignal.explanation || 'Recent measurements trend opposite your target direction. Review daily caloric targets and hydration.';
+      } else if (primarySignal.type === 'unusual_entry') {
+        intelClass = 'intel-plateau';
+        intelIcon = 'fa-bolt';
+        intelStatus = 'Anomalous Entry';
+        intelTitle = primarySignal.title || 'Unusual Weigh-in Entry';
+        intelDesc = primarySignal.explanation || 'Latest weigh-in varied sharply from trend. Likely normal water fluctuation or measurement variance.';
+      } else if (primarySignal.type === 'behavior_drop') {
+        intelClass = 'intel-plateau';
+        intelIcon = 'fa-chart-line';
+        intelStatus = 'Activity Dip';
+        intelTitle = primarySignal.title || 'Activity Frequency Shift';
+        intelDesc = primarySignal.explanation || 'Check-in logging or step count has dropped below your personal baseline. Daily tracking protects momentum.';
+      } else if (primarySignal.type === 'insufficient') {
+        intelClass = '';
+        intelIcon = 'fa-wave-square';
+        intelStatus = 'Calibrating';
+        intelTitle = 'Statistical Telemetry Calibrating';
+        intelDesc = primarySignal.explanation || 'Statistical trend detection requires at least 4 weigh-ins spanning 7 calendar days. Continue your daily logs.';
+      }
+    } else if (analyticsData.velocity && analyticsData.velocity.onTrack) {
+      intelTitle = 'Weekly Velocity On Track';
+      intelDesc = `Current rate (${analyticsData.velocity.weeklyRate || 0} kg/wk) is matching required trajectory for your target date.`;
+    }
+
+    const intelSectionHtml = `
+      <div class="dash-intel-card ${intelClass}">
+        <div class="dash-intel-beacon">
+          <i class="fas ${intelIcon}"></i>
+        </div>
+        <div class="dash-intel-content">
+          <div class="dash-intel-top">
+            <span class="dash-intel-eyebrow">${intelEyebrow}</span>
+            <span class="dash-intel-status-pill">${intelStatus}</span>
           </div>
-          <div class="value">${score} <span class="unit">/ 100</span></div>
-          <div class="subtitle text-${ratingClass}">${rating} Status</div>
+          <h4 class="dash-intel-title">${escapeHtml(intelTitle)}</h4>
+          <p class="dash-intel-desc">${escapeHtml(intelDesc)}</p>
+        </div>
+        <button class="dash-btn-secondary" onclick="switchSection('analytics', document.querySelector('.dropdown-item[onclick*=\\'analytics\\']'))" style="align-self: center; flex-shrink: 0;">
+          <span>Analytics</span>
+          <i class="fas fa-chevron-right" style="font-size: 10px;"></i>
+        </button>
+      </div>
+    `;
+
+    // 5. TODAY (Daily Check-in Status)
+    const todayLogged = checkinToday.logged && checkinToday.data;
+    const cData = todayLogged ? checkinToday.data : {};
+
+    const weightVal = cData.weight !== undefined && cData.weight !== null ? `${cData.weight} kg` : null;
+    let waterVal = null;
+    if (cData.water_intake_l !== undefined && cData.water_intake_l !== null) {
+      waterVal = `${cData.water_intake_l.toFixed(1)} L`;
+    } else if (cData.water_intake_ml) {
+      waterVal = `${(cData.water_intake_ml / 1000).toFixed(1)} L`;
+    }
+
+    const stepsVal = cData.steps_count !== undefined && cData.steps_count !== null ? `${cData.steps_count.toLocaleString()} steps` : null;
+    let workoutVal = null;
+    if (cData.workout_completed) {
+      workoutVal = cData.workout_duration_mins ? `Done (${cData.workout_duration_mins}m)` : 'Completed';
+    } else if (cData.workout_completed === false) {
+      workoutVal = 'Rest Day';
+    }
+
+    const energyVal = cData.energy_level !== undefined && cData.energy_level !== null ? `${cData.energy_level} / 10` : null;
+
+    let loggedCount = 0;
+    if (weightVal) loggedCount++;
+    if (waterVal) loggedCount++;
+    if (stepsVal) loggedCount++;
+    if (workoutVal) loggedCount++;
+    if (energyVal) loggedCount++;
+
+    const todaySectionHtml = `
+      <div class="dash-card">
+        <div class="dash-card-header">
+          <h3 class="dash-card-title"><i class="fas fa-calendar-check"></i> Today's Status</h3>
+          <span class="dash-tag">${loggedCount} of 5 Logged</span>
         </div>
 
-        <div class="stats-card" onclick="switchSection('journey', document.querySelector('.nav-tab[onclick*=\\'journey\\']'))">
-          <div class="stats-header">
-            <span class="label">Goal Progress</span>
-            <i class="fas fa-bullseye" style="color: var(--success);"></i>
+        <div class="dash-today-grid">
+          <!-- Weight -->
+          <div class="dash-metric-tile ${weightVal ? 'tile-logged' : 'tile-pending'}" onclick="switchSection('checkin', document.querySelector('.nav-tab[onclick*=\\'checkin\\']'))">
+            <div class="dash-metric-tile-header">
+              <span class="dash-metric-name">Weight</span>
+              <span class="dash-metric-badge">${weightVal ? '<i class="fas fa-check-circle" style="color:#00F5A0;"></i>' : '<i class="fas fa-circle" style="color:#71717A; font-size:7px;"></i>'}</span>
+            </div>
+            ${weightVal
+        ? `<span class="dash-metric-val">${weightVal}</span>`
+        : `<span class="dash-metric-prompt">+ Log Weight</span>`}
           </div>
-          <div class="value">${progressPct}%</div>
-          <div class="subtitle">${escapeHtml(progressText)}</div>
-        </div>
 
-        <div class="stats-card" onclick="switchSection('recommendations', document.querySelector('.nav-tab[onclick*=\\'recommendations\\']'))">
-          <div class="stats-header">
-            <span class="label">Recommendations</span>
-            <i class="fas fa-lightbulb" style="color: var(--warning);"></i>
+          <!-- Hydration -->
+          <div class="dash-metric-tile ${waterVal ? 'tile-logged' : 'tile-pending'}" onclick="switchSection('checkin', document.querySelector('.nav-tab[onclick*=\\'checkin\\']'))">
+            <div class="dash-metric-tile-header">
+              <span class="dash-metric-name">Water</span>
+              <span class="dash-metric-badge">${waterVal ? '<i class="fas fa-check-circle" style="color:#00F5A0;"></i>' : '<i class="fas fa-circle" style="color:#71717A; font-size:7px;"></i>'}</span>
+            </div>
+            ${waterVal
+        ? `<span class="dash-metric-val">${waterVal}</span>`
+        : `<span class="dash-metric-prompt">+ Log Water</span>`}
           </div>
-          <div class="value">${recCount}</div>
-          <div class="subtitle">${recCount === 1 ? 'Action item' : 'Action items'} triggered</div>
-        </div>
 
-        <div class="stats-card" onclick="switchSection('checkin', document.querySelector('.nav-tab[onclick*=\\'checkin\\']'))">
-          <div class="stats-header">
-            <span class="label">Logging Streak</span>
-            <i class="fas fa-fire" style="color: var(--danger);"></i>
+          <!-- Steps -->
+          <div class="dash-metric-tile ${stepsVal ? 'tile-logged' : 'tile-pending'}" onclick="switchSection('checkin', document.querySelector('.nav-tab[onclick*=\\'checkin\\']'))">
+            <div class="dash-metric-tile-header">
+              <span class="dash-metric-name">Steps</span>
+              <span class="dash-metric-badge">${stepsVal ? '<i class="fas fa-check-circle" style="color:#00F5A0;"></i>' : '<i class="fas fa-circle" style="color:#71717A; font-size:7px;"></i>'}</span>
+            </div>
+            ${stepsVal
+        ? `<span class="dash-metric-val">${stepsVal}</span>`
+        : `<span class="dash-metric-prompt">+ Log Steps</span>`}
           </div>
-          <div class="value">${escapeHtml(streakText)}</div>
-          <div class="subtitle">Log daily to protect streak</div>
+
+          <!-- Workout -->
+          <div class="dash-metric-tile ${workoutVal ? 'tile-logged' : 'tile-pending'}" onclick="switchSection('checkin', document.querySelector('.nav-tab[onclick*=\\'checkin\\']'))">
+            <div class="dash-metric-tile-header">
+              <span class="dash-metric-name">Workout</span>
+              <span class="dash-metric-badge">${workoutVal ? '<i class="fas fa-check-circle" style="color:#00F5A0;"></i>' : '<i class="fas fa-circle" style="color:#71717A; font-size:7px;"></i>'}</span>
+            </div>
+            ${workoutVal
+        ? `<span class="dash-metric-val">${workoutVal}</span>`
+        : `<span class="dash-metric-prompt">+ Log Workout</span>`}
+          </div>
+
+          <!-- Energy -->
+          <div class="dash-metric-tile ${energyVal ? 'tile-logged' : 'tile-pending'}" onclick="switchSection('checkin', document.querySelector('.nav-tab[onclick*=\\'checkin\\']'))">
+            <div class="dash-metric-tile-header">
+              <span class="dash-metric-name">Energy</span>
+              <span class="dash-metric-badge">${energyVal ? '<i class="fas fa-check-circle" style="color:#00F5A0;"></i>' : '<i class="fas fa-circle" style="color:#71717A; font-size:7px;"></i>'}</span>
+            </div>
+            ${energyVal
+        ? `<span class="dash-metric-val">${energyVal}</span>`
+        : `<span class="dash-metric-prompt">+ Rate Energy</span>`}
+          </div>
         </div>
       </div>
+    `;
 
-      <!-- Dashboard Split Layout -->
-      <div class="dashboard-grid">
-        <!-- Left Side: Today's Summary & Priority Focus -->
-        <div class="dashboard-left" style="display: flex; flex-direction: column; gap: var(--space-lg);">
-          
-          <!-- Today's Summary Card -->
-          <div class="glass-card" style="padding: 24px;">
-            <h3 style="margin-top:0; font-size: 15px; font-weight:700; color:#fff; display:flex; align-items:center; gap:8px;">
-              <i class="fas fa-calendar-day" style="color: var(--primary);"></i> Today's Summary
-            </h3>
-            <div class="today-summary-grid">
-              <div class="summary-metric-item">
-                <i class="fas fa-walking" style="color: var(--primary);"></i>
-                <div class="metric-info">
-                  <span class="metric-title">Steps</span>
-                  <span class="metric-value">${stepsDisplay}</span>
-                </div>
-              </div>
-              <div class="summary-metric-item">
-                <i class="fas fa-tint" style="color: var(--primary);"></i>
-                <div class="metric-info">
-                  <span class="metric-title">Hydration</span>
-                  <span class="metric-value">${hydrationDisplay}</span>
-                </div>
-              </div>
-              <div class="summary-metric-item">
-                <i class="fas fa-dumbbell" style="color: var(--primary);"></i>
-                <div class="metric-info">
-                  <span class="metric-title">Workout</span>
-                  <span class="metric-value">${workoutDisplay}</span>
-                </div>
-              </div>
-              <div class="summary-metric-item">
-                <i class="fas fa-bolt" style="color: var(--primary);"></i>
-                <div class="metric-info">
-                  <span class="metric-title">Energy Level</span>
-                  <span class="metric-value">${energyDisplay}</span>
-                </div>
-              </div>
-            </div>
+    // 6. NEXT ACTION (Clear Priority Recommendation)
+    let nextActionHtml = '';
+    const recs = (recData.success && recData.recommendations) ? recData.recommendations : [];
+
+    if (recs.length > 0) {
+      const prioOrder = { high: 1, medium: 2, low: 3 };
+      const sortedRecs = [...recs].sort((a, b) => (prioOrder[a.priority] || 4) - (prioOrder[b.priority] || 4));
+      const topRec = sortedRecs[0];
+
+      const categoryLabels = {
+        goal_progress: 'Goal Strategy',
+        activity: 'Activity Habit',
+        hydration: 'Hydration Target',
+        recovery: 'Recovery & Rest',
+        consistency: 'Routine Consistency'
+      };
+      const catLabel = categoryLabels[topRec.category] || topRec.category;
+      const catIcon = getCategoryIcon(topRec.category);
+      const impactScore = getHealthScoreImpact(topRec.category, topRec.priority);
+
+      let targetSection = 'checkin';
+      if (topRec.category === 'activity') targetSection = 'workouts';
+      else if (topRec.category === 'goal_progress') targetSection = 'goals';
+
+      nextActionHtml = `
+        <div class="dash-card">
+          <div class="dash-card-header">
+            <h3 class="dash-card-title"><i class="fas fa-bolt"></i> Next Action</h3>
+            <span class="dash-tag" style="color: #00D2FF; border-color: rgba(0, 210, 255, 0.3);">${escapeHtml(catLabel)}</span>
           </div>
-
-          <!-- Priority Focus Card -->
-          ${priorityFocusHtml}
-
-        </div>
-
-        <!-- Right Side: AI Coach Mood & Summary Card -->
-        <div class="dashboard-right">
-          <div class="glass-card" style="padding: 24px; height: 100%; display: flex; flex-direction: column; justify-content: space-between; gap: 20px;">
+          <div class="dash-nextaction-body">
             <div>
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h3 style="margin:0; font-size: 15px; font-weight:700; color:#fff; display:flex; align-items:center; gap:8px;">
-                  <i class="fas fa-robot" style="color: var(--primary);"></i> AI Coach
-                </h3>
-                <span style="font-size: 11px; font-weight: 800; background: ${moodColorBg}; color: ${moodColorText}; padding: 4px 10px; border-radius: 20px; border: 1px solid ${moodBorderColor};">
-                  Mood: ${moodText}
-                </span>
-              </div>
-              
-              <p style="font-size: 13.5px; line-height:1.5; color: rgba(255,255,255,0.85); margin: 0 0 16px 0; font-style: italic;">
-                "${escapeHtml(coachData.dailySummary.summary)}"
-              </p>
-              
-              <div style="background: rgba(59, 130, 246, 0.05); border-left: 4px solid var(--primary); padding: 12px 14px; border-radius: 4px 12px 12px 4px; margin-bottom: 20px;">
-                <span style="display:block; font-size: 10px; font-weight:800; color:rgba(255,255,255,0.4); text-transform:uppercase; margin-bottom: 2px;">Today's Key Focus</span>
-                <span style="font-size: 13px; font-weight: 600; color: var(--warning-gold); line-height:1.4;">${escapeHtml(coachData.dailySummary.focus)}</span>
-              </div>
+              <h4 class="dash-action-headline">${escapeHtml(topRec.title)}</h4>
+              <p class="dash-action-desc">${escapeHtml(topRec.description)}</p>
             </div>
 
-            <div class="stats-split" style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 16px;">
-              <div>
-                <h4 style="margin:0 0 8px 0; font-size: 11px; font-weight:800; color:var(--success); text-transform:uppercase; letter-spacing:0.5px;">Weekly Wins</h4>
-                <div style="display:flex; flex-direction:column; gap:6px;">
-                  ${coachData.weeklySummary.wins && coachData.weeklySummary.wins.length > 0 ? 
-                    coachData.weeklySummary.wins.slice(0, 2).map(w => `
-                      <div style="font-size: 12px; color:rgba(255,255,255,0.75); display:flex; align-items:start; gap: 8px;">
-                        <i class="fas fa-check-circle" style="color:var(--success); margin-top:2px; font-size:11px;"></i>
-                        <span>${escapeHtml(w)}</span>
-                      </div>
-                    `).join('') : `
-                      <div style="font-size: 12px; color:rgba(255,255,255,0.45); font-style:italic;">No wins logged yet.</div>
-                    `
-                  }
-                </div>
-              </div>
-              <div>
-                <h4 style="margin:0 0 8px 0; font-size: 11px; font-weight:800; color:var(--danger); text-transform:uppercase; letter-spacing:0.5px;">Weekly Risks</h4>
-                <div style="display:flex; flex-direction:column; gap:6px;">
-                  ${coachData.weeklySummary.risks && coachData.weeklySummary.risks.length > 0 ? 
-                    coachData.weeklySummary.risks.slice(0, 2).map(r => `
-                      <div style="font-size: 12px; color:rgba(255,255,255,0.75); display:flex; align-items:start; gap: 8px;">
-                        <i class="fas fa-exclamation-triangle" style="color:var(--danger); margin-top:2px; font-size:11px;"></i>
-                        <span>${escapeHtml(r)}</span>
-                      </div>
-                    `).join('') : `
-                      <div style="font-size: 12px; color:rgba(255,255,255,0.45); font-style:italic;">No active risks.</div>
-                    `
-                  }
-                </div>
-              </div>
+            <div class="dash-action-impact-box">
+              <span class="dash-impact-label">Potential Score Gain</span>
+              <span class="dash-impact-val">${impactScore}</span>
             </div>
-            
-            <div style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 16px; text-align: center;">
-              <button class="btn-action" onclick="switchSection('coach', document.querySelector('.nav-tab[onclick*=\\'coach\\']'))" style="margin: 0 auto; display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px;">
-                <span>Ask Coach a Question</span>
-                <i class="fas fa-chevron-right" style="font-size: 10px;"></i>
-              </button>
+
+            <button class="dash-btn-primary" onclick="switchSection('${targetSection}')">
+              <span>Execute Action</span>
+              <i class="fas fa-arrow-right" style="font-size: 11px;"></i>
+            </button>
+          </div>
+        </div>
+      `;
+    } else {
+      nextActionHtml = `
+        <div class="dash-card">
+          <div class="dash-card-header">
+            <h3 class="dash-card-title"><i class="fas fa-bolt"></i> Next Action</h3>
+            <span class="dash-tag" style="color: #00F5A0;">Optimized</span>
+          </div>
+          <div class="dash-nextaction-body" style="text-align: center; align-items: center; justify-content: center;">
+            <i class="fas fa-check-circle" style="font-size: 32px; color: #00F5A0; margin-bottom: 8px;"></i>
+            <h4 class="dash-action-headline" style="margin-bottom: 4px;">System Fully Balanced</h4>
+            <p class="dash-action-desc" style="max-width: 280px;">All check-in habits and nutrition markers are within target range. Protect your streak with today's log.</p>
+            <button class="dash-btn-secondary" onclick="switchSection('checkin')" style="margin-top: 10px;">
+              <span>Open Check-in</span>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // 7. JOURNEY PREVIEW (Compact Weight Spark-Curve)
+    const weightHistory = (analyticsData.success && analyticsData.weightHistory) ? analyticsData.weightHistory : [];
+    const sparklineSvg = renderDashboardSparkline(weightHistory);
+
+    let latestWeightStr = '--';
+    let totalDeltaStr = '--';
+    if (weightHistory.length > 0) {
+      const latestW = weightHistory[weightHistory.length - 1].weight;
+      const firstW = weightHistory[0].weight;
+      latestWeightStr = `${latestW.toFixed(1)} kg`;
+      const delta = (latestW - firstW);
+      totalDeltaStr = `${delta > 0 ? '+' : ''}${delta.toFixed(1)} kg`;
+    }
+
+    let weeklyVelocityStr = 'Calibrating';
+    if (analyticsData.velocity && typeof analyticsData.velocity.weeklyRate === 'number') {
+      const rate = analyticsData.velocity.weeklyRate;
+      weeklyVelocityStr = `${rate > 0 ? '+' : ''}${rate.toFixed(2)} kg/wk`;
+    }
+
+    const journeyPreviewHtml = `
+      <div class="dash-card" onclick="switchSection('journey', document.querySelector('.nav-tab[onclick*=\\'journey\\']'))" style="cursor: pointer;">
+        <div class="dash-card-header">
+          <h3 class="dash-card-title"><i class="fas fa-chart-line"></i> Weight Trajectory</h3>
+          <span class="dash-tag">30-Day Window</span>
+        </div>
+        <div class="dash-journey-spark-wrap">
+          ${sparklineSvg}
+
+          <div class="dash-journey-stats">
+            <div class="dash-j-stat">
+              <span class="j-label">Latest Weigh-in</span>
+              <span class="j-val">${latestWeightStr}</span>
+            </div>
+            <div class="dash-j-stat">
+              <span class="j-label">Total Delta</span>
+              <span class="j-val">${totalDeltaStr}</span>
+            </div>
+            <div class="dash-j-stat">
+              <span class="j-label">Weekly Velocity</span>
+              <span class="j-val">${weeklyVelocityStr}</span>
             </div>
           </div>
         </div>
       </div>
     `;
 
+    // 8. AI COACH ENTRY
+    const coachDaily = (coachData.success && coachData.dailySummary) ? coachData.dailySummary : {};
+    const coachQuote = coachDaily.summary || "Your biometric telemetry is active. Consistent logging creates the statistical resolution required for precision guidance.";
+    const coachFocus = coachDaily.focus || "Maintain hydration and active recovery pace.";
+
+    const coachEntryHtml = `
+      <div class="dash-card">
+        <div class="dash-card-header">
+          <h3 class="dash-card-title"><i class="fas fa-robot" style="color: #A78BFA;"></i> AI Coach</h3>
+          <span class="dash-tag" style="color: #A78BFA; border-color: rgba(167, 139, 250, 0.3);">
+            <i class="fas fa-circle" style="font-size: 6px; margin-right: 4px; color: #00F5A0;"></i> Synchronized
+          </span>
+        </div>
+
+        <div class="dash-coach-body">
+          <p class="dash-coach-quote">"${escapeHtml(coachQuote)}"</p>
+
+          <div class="dash-coach-focus-pill">
+            <span class="dash-coach-focus-label">Today's Directive</span>
+            <span class="dash-coach-focus-text">${escapeHtml(coachFocus)}</span>
+          </div>
+
+          <div class="dash-coach-prompts">
+            <span class="dash-prompt-chip" onclick="switchSection('coach'); event.stopPropagation();">
+              "How is my weight velocity?"
+            </span>
+            <span class="dash-prompt-chip" onclick="switchSection('coach'); event.stopPropagation();">
+              "Review rest day nutrition"
+            </span>
+          </div>
+
+          <button class="dash-btn-primary" onclick="switchSection('coach', document.querySelector('.nav-tab[onclick*=\\'coach\\']'))" style="background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%);">
+            <span>Consult AI Coach</span>
+            <i class="fas fa-arrow-right" style="font-size: 11px;"></i>
+          </button>
+        </div>
+      </div>
+    `;
+
+    // Assemble the complete Dashboard Layout
+    container.innerHTML = `
+      <div class="dashboard-layout-container">
+        <!-- Stage 1: Health State Hero + Goal Progress Hero -->
+        <div class="dash-hero-grid">
+          <!-- Health Hero Card -->
+          <div class="dash-card" onclick="switchSection('healthscore', document.querySelector('.nav-tab[onclick*=\\'healthscore\\']'))" style="cursor: pointer;">
+            <div class="dash-card-header">
+              <h3 class="dash-card-title"><i class="fas fa-heartbeat"></i> Health State</h3>
+              <span class="dash-tier-badge tier-${ratingClass}">
+                <i class="fas fa-shield-halved"></i> ${rating}
+              </span>
+            </div>
+
+            <div class="dash-health-hero">
+              <div class="dash-gauge-wrapper">
+                <svg class="dash-gauge-svg" viewBox="0 0 120 120">
+                  <circle class="dash-gauge-bg" cx="60" cy="60" r="54" fill="none" stroke-width="8" />
+                  <circle class="dash-gauge-progress" cx="60" cy="60" r="54" fill="none"
+                    stroke="${gaugeColor}"
+                    stroke-width="8"
+                    stroke-dasharray="${circ}"
+                    stroke-dashoffset="${strokeOffset}" />
+                </svg>
+                <div class="dash-gauge-center">
+                  <span class="dash-score-num">${score}</span>
+                  <span class="dash-score-denom">OF 100</span>
+                </div>
+              </div>
+
+              <div class="dash-health-details">
+                <p class="dash-health-driver">${escapeHtml(driverText)}</p>
+
+                <div class="dash-pillars-mini">
+                  <div class="dash-pillar-row">
+                    <span class="dash-pillar-name">Goal Progress</span>
+                    <div class="dash-pillar-bar"><div class="dash-pillar-fill" style="width: ${(breakdown.goalProgress?.score || 0) / 25 * 100}%;"></div></div>
+                    <span class="dash-pillar-val">${breakdown.goalProgress?.score || 0}/25</span>
+                  </div>
+                  <div class="dash-pillar-row">
+                    <span class="dash-pillar-name">Activity Habits</span>
+                    <div class="dash-pillar-bar"><div class="dash-pillar-fill" style="width: ${(breakdown.activityHabits?.score || 0) / 20 * 100}%;"></div></div>
+                    <span class="dash-pillar-val">${breakdown.activityHabits?.score || 0}/20</span>
+                  </div>
+                  <div class="dash-pillar-row">
+                    <span class="dash-pillar-name">Hydration</span>
+                    <div class="dash-pillar-bar"><div class="dash-pillar-fill" style="width: ${(breakdown.hydration?.score || 0) / 15 * 100}%;"></div></div>
+                    <span class="dash-pillar-val">${breakdown.hydration?.score || 0}/15</span>
+                  </div>
+                  <div class="dash-pillar-row">
+                    <span class="dash-pillar-name">Consistency</span>
+                    <div class="dash-pillar-bar"><div class="dash-pillar-fill" style="width: ${(breakdown.checkinStreaks?.score || 0) / 25 * 100}%;"></div></div>
+                    <span class="dash-pillar-val">${breakdown.checkinStreaks?.score || 0}/25</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Goal Hero Card -->
+          ${goalHeroHtml}
+        </div>
+
+        <!-- Stage 2: "What Changed?" Intelligence (Capability 3) -->
+        ${intelSectionHtml}
+
+        <!-- Stage 3: Today's Biometric Logbook + Next Action Directive -->
+        <div class="dash-split-grid">
+          ${todaySectionHtml}
+          ${nextActionHtml}
+        </div>
+
+        <!-- Stage 4: Weight Journey Preview + AI Coach Integration -->
+        <div class="dash-split-grid">
+          ${journeyPreviewHtml}
+          ${coachEntryHtml}
+        </div>
+      </div>
+    `;
+
   } catch (err) {
     console.error(err);
-    container.innerHTML = `<p class="msg error" style="margin: 20px;">Failed to connect to stats server.</p>`;
+    container.innerHTML = `
+      <div class="dash-card" style="padding: 28px; text-align: center;">
+        <i class="fas fa-exclamation-triangle" style="font-size: 28px; color: #EF4444; margin-bottom: 12px;"></i>
+        <h4 style="margin: 0 0 6px 0; color: #FAFAFA;">Failed to load dashboard telemetry</h4>
+        <p style="margin: 0 0 16px 0; font-size: 13px; color: #A1A1AA;">Unable to connect to local health service. Please refresh or check your session.</p>
+        <button class="dash-btn-secondary" onclick="loadDashboardHome()">
+          <i class="fas fa-rotate-right"></i> Retry Sync
+        </button>
+      </div>
+    `;
   }
 }
 
- 
+

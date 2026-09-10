@@ -4,7 +4,10 @@ const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const db = require('./db/index');
-
+const { analyzeProgressSignals } = require('./lib/progressSignals');
+const { predictGoalAchievement } = require('./lib/goalAchievement');
+const { generatePersonalizedRecommendations } = require('./lib/personalizedRecommendations');
+const { generateHealthInsights } = require('./lib/healthInsights');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -213,12 +216,49 @@ app.post('/api/profile', async (req, res) => {
   }
 });
 
+// ─── Goals: Helper for Progress Calculation ────────────────────────
+function calculateGoalProgress(goal, currentWeight) {
+  const sw = parseFloat(goal.start_weight);
+  const tw = parseFloat(goal.target_weight);
+  const cw = currentWeight !== null && currentWeight !== undefined ? parseFloat(currentWeight) : sw;
+  let progress_pct = 0;
+
+  if (goal.goal_type === 'weight_loss') {
+    if (sw !== tw) {
+      progress_pct = ((sw - cw) / (sw - tw)) * 100;
+    }
+  } else if (goal.goal_type === 'muscle_gain') {
+    if (sw !== tw) {
+      progress_pct = ((cw - sw) / (tw - sw)) * 100;
+    }
+  } else if (goal.goal_type === 'maintenance') {
+    const deviation = Math.abs(cw - tw);
+    const startMs = new Date(goal.start_date).getTime();
+    const targetMs = new Date(goal.target_date).getTime();
+    const nowMs = Math.min(targetMs, Math.max(startMs, Date.now()));
+    let timePct = 100;
+    if (targetMs > startMs) {
+      timePct = ((nowMs - startMs) / (targetMs - startMs)) * 100;
+    }
+    if (deviation <= 2) {
+      progress_pct = timePct;
+    } else {
+      progress_pct = Math.max(0, timePct - (deviation - 2) * 15);
+    }
+  }
+
+  return Math.max(0, Math.min(100, Math.round(progress_pct * 10) / 10));
+}
+
 // ─── Goals: Create ────────────────────────────────────────────────
 app.post('/api/goals', async (req, res) => {
   if (!req.session.user)
     return res.json({ success: false, message: 'Not logged in.' });
 
-  const { goal_name, goal_type, start_weight, target_weight, target_date } = req.body;
+  const {
+    goal_name, goal_type, start_weight, target_weight, target_date,
+    target_calories, target_protein_g, target_carbs_g, target_fats_g
+  } = req.body;
 
   const validTypes = ['weight_loss', 'muscle_gain', 'maintenance'];
   if (!goal_type || !validTypes.includes(goal_type))
@@ -247,21 +287,44 @@ app.post('/api/goals', async (req, res) => {
   if (goal_name && goal_name.length > 100)
     return res.json({ success: false, message: 'Goal name must be 100 characters or fewer.' });
 
+  // Optional target nutrition validation
+  const tCal = target_calories !== undefined && target_calories !== '' && target_calories !== null ? parseInt(target_calories, 10) : null;
+  const tProt = target_protein_g !== undefined && target_protein_g !== '' && target_protein_g !== null ? parseInt(target_protein_g, 10) : null;
+  const tCarbs = target_carbs_g !== undefined && target_carbs_g !== '' && target_carbs_g !== null ? parseInt(target_carbs_g, 10) : null;
+  const tFats = target_fats_g !== undefined && target_fats_g !== '' && target_fats_g !== null ? parseInt(target_fats_g, 10) : null;
+
+  if (tCal !== null && (isNaN(tCal) || tCal < 500 || tCal > 10000))
+    return res.json({ success: false, message: 'Target calories must be between 500 and 10,000 kcal.' });
+  if (tProt !== null && (isNaN(tProt) || tProt < 0 || tProt > 500))
+    return res.json({ success: false, message: 'Target protein must be between 0 and 500 g.' });
+  if (tCarbs !== null && (isNaN(tCarbs) || tCarbs < 0 || tCarbs > 1000))
+    return res.json({ success: false, message: 'Target carbs must be between 0 and 1,000 g.' });
+  if (tFats !== null && (isNaN(tFats) || tFats < 0 || tFats > 300))
+    return res.json({ success: false, message: 'Target fats must be between 0 and 300 g.' });
+
   try {
     const userId = req.session.user.id;
     const activeCheck = await pool.query(
-      'SELECT id FROM goals WHERE user_id = $1 AND status = $2',
+      'SELECT COUNT(*) FROM goals WHERE user_id = $1 AND status = $2',
       [userId, 'active']
     );
-    if (activeCheck.rows.length >= 1)
-      return res.json({ success: false, message: 'You already have an active goal. Complete or cancel it before creating a new one.' });
+    const activeCount = parseInt(activeCheck.rows[0].count, 10);
+    if (activeCount >= 3)
+      return res.json({ success: false, message: 'You can have a maximum of 3 active goals at a time. Complete or pause an existing goal first.' });
 
     const result = await pool.query(
-      `INSERT INTO goals (user_id, goal_name, goal_type, start_weight, target_weight, start_date, target_date)
-       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, $6) RETURNING *`,
-      [userId, goal_name || null, goal_type, sw, tw, target_date]
+      `INSERT INTO goals (
+         user_id, goal_name, goal_type, start_weight, target_weight,
+         start_date, target_date, target_calories, target_protein_g, target_carbs_g, target_fats_g, status
+       )
+       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, $6, $7, $8, $9, $10, 'active')
+       RETURNING *`,
+      [userId, goal_name || null, goal_type, sw, tw, target_date, tCal, tProt, tCarbs, tFats]
     );
-    res.json({ success: true, goal: result.rows[0] });
+
+    const goal = result.rows[0];
+    const progress_pct = calculateGoalProgress(goal, sw);
+    res.json({ success: true, goal: { ...goal, current_weight: sw, progress_pct } });
   } catch (err) {
     console.error(err);
     res.json({ success: false, message: 'Server error. Please try again.' });
@@ -286,14 +349,10 @@ app.get('/api/goals', async (req, res) => {
       [userId]
     );
     const goals = result.rows.map(g => {
-      const sw = parseFloat(g.start_weight);
-      const tw = parseFloat(g.target_weight);
-      const cw = g.current_weight !== null ? parseFloat(g.current_weight) : sw;
-      let progress_pct = 0;
-      if (sw !== tw) {
-        progress_pct = ((sw - cw) / (sw - tw)) * 100;
-        progress_pct = Math.max(0, Math.min(100, Math.round(progress_pct * 10) / 10));
-      }
+      const cw = g.current_weight !== null && g.current_weight !== undefined
+        ? parseFloat(g.current_weight)
+        : parseFloat(g.start_weight);
+      const progress_pct = calculateGoalProgress(g, cw);
       return { ...g, current_weight: cw, progress_pct };
     });
     res.json({ success: true, goals });
@@ -309,7 +368,10 @@ app.put('/api/goals/:id', async (req, res) => {
     return res.json({ success: false, message: 'Not logged in.' });
 
   const { id } = req.params;
-  const { goal_name, target_weight, target_date } = req.body;
+  const {
+    goal_name, target_weight, target_date,
+    target_calories, target_protein_g, target_carbs_g, target_fats_g
+  } = req.body;
 
   try {
     const userId = req.session.user.id;
@@ -323,7 +385,8 @@ app.put('/api/goals/:id', async (req, res) => {
     if (goal.status !== 'active')
       return res.json({ success: false, message: 'Only active goals can be edited.' });
 
-    if (target_weight !== undefined && target_weight !== '') {
+    let updatedTw = parseFloat(goal.target_weight);
+    if (target_weight !== undefined && target_weight !== '' && target_weight !== null) {
       const tw = parseFloat(target_weight);
       const sw = parseFloat(goal.start_weight);
       if (isNaN(tw) || tw < 20 || tw > 300)
@@ -334,33 +397,62 @@ app.put('/api/goals/:id', async (req, res) => {
         return res.json({ success: false, message: 'For muscle gain, target weight must be greater than start weight.' });
       if (goal.goal_type === 'maintenance' && Math.abs(tw - sw) > 2)
         return res.json({ success: false, message: 'For maintenance, target weight must be within 2 kg of start weight.' });
+      updatedTw = tw;
     }
+
+    let updatedTd = goal.target_date;
     if (target_date) {
       const td = new Date(target_date);
       const today = new Date(); today.setHours(0, 0, 0, 0);
       if (td <= today)
         return res.json({ success: false, message: 'Target date must be a future date.' });
+      updatedTd = target_date;
     }
 
-    const tw = target_weight && target_weight !== '' ? parseFloat(target_weight) : null;
+    if (goal_name && goal_name.length > 100)
+      return res.json({ success: false, message: 'Goal name must be 100 characters or fewer.' });
+
+    const tCal = target_calories !== undefined ? (target_calories !== '' && target_calories !== null ? parseInt(target_calories, 10) : null) : goal.target_calories;
+    const tProt = target_protein_g !== undefined ? (target_protein_g !== '' && target_protein_g !== null ? parseInt(target_protein_g, 10) : null) : goal.target_protein_g;
+    const tCarbs = target_carbs_g !== undefined ? (target_carbs_g !== '' && target_carbs_g !== null ? parseInt(target_carbs_g, 10) : null) : goal.target_carbs_g;
+    const tFats = target_fats_g !== undefined ? (target_fats_g !== '' && target_fats_g !== null ? parseInt(target_fats_g, 10) : null) : goal.target_fats_g;
+
+    if (tCal !== null && (isNaN(tCal) || tCal < 500 || tCal > 10000))
+      return res.json({ success: false, message: 'Target calories must be between 500 and 10,000 kcal.' });
+    if (tProt !== null && (isNaN(tProt) || tProt < 0 || tProt > 500))
+      return res.json({ success: false, message: 'Target protein must be between 0 and 500 g.' });
+    if (tCarbs !== null && (isNaN(tCarbs) || tCarbs < 0 || tCarbs > 1000))
+      return res.json({ success: false, message: 'Target carbs must be between 0 and 1,000 g.' });
+    if (tFats !== null && (isNaN(tFats) || tFats < 0 || tFats > 300))
+      return res.json({ success: false, message: 'Target fats must be between 0 and 300 g.' });
+
     const result = await pool.query(
       `UPDATE goals
-       SET goal_name = COALESCE($1, goal_name),
-           target_weight = COALESCE($2, target_weight),
-           target_date = COALESCE($3, target_date),
+       SET goal_name = $1,
+           target_weight = $2,
+           target_date = $3,
+           target_calories = $4,
+           target_protein_g = $5,
+           target_carbs_g = $6,
+           target_fats_g = $7,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4 AND user_id = $5 AND status = 'active'
+       WHERE id = $8 AND user_id = $9 AND status = 'active'
        RETURNING *`,
-      [goal_name || null, tw, target_date || null, id, userId]
+      [goal_name !== undefined ? (goal_name || null) : goal.goal_name, updatedTw, updatedTd, tCal, tProt, tCarbs, tFats, id, userId]
     );
-    res.json({ success: true, goal: result.rows[0] });
+
+    if (result.rows.length === 0)
+      return res.json({ success: false, message: 'Goal not found or cannot be modified.' });
+
+    const updated = result.rows[0];
+    res.json({ success: true, goal: updated });
   } catch (err) {
     console.error(err);
     res.json({ success: false, message: 'Server error. Please try again.' });
   }
 });
 
-// ─── Goals: Update Status ─────────────────────────────────────────
+// ─── Goals: Update Status (Pause, Resume, Complete, Cancel) ────────
 app.patch('/api/goals/:id/status', async (req, res) => {
   if (!req.session.user)
     return res.json({ success: false, message: 'Not logged in.' });
@@ -368,19 +460,50 @@ app.patch('/api/goals/:id/status', async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
-  if (!['completed', 'cancelled'].includes(status))
-    return res.json({ success: false, message: 'Invalid status. Must be "completed" or "cancelled".' });
+  const validStatuses = ['active', 'paused', 'completed', 'cancelled'];
+  if (!status || !validStatuses.includes(status))
+    return res.json({ success: false, message: 'Invalid status. Must be active, paused, completed, or cancelled.' });
 
   try {
     const userId = req.session.user.id;
+    const existingRes = await pool.query(
+      'SELECT * FROM goals WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+
+    if (existingRes.rows.length === 0)
+      return res.json({ success: false, message: 'Goal not found.' });
+
+    const goal = existingRes.rows[0];
+
+    // Terminal states cannot be altered
+    if (goal.status === 'completed' || goal.status === 'cancelled') {
+      return res.json({ success: false, message: `This goal has already been ${goal.status} and cannot be modified.` });
+    }
+
+    // Status transition rules
+    if (status === 'active') {
+      // Resuming from paused
+      if (goal.status !== 'paused') {
+        return res.json({ success: false, message: 'Goal is already active.' });
+      }
+      const activeCountRes = await pool.query(
+        'SELECT COUNT(*) FROM goals WHERE user_id = $1 AND status = $2',
+        [userId, 'active']
+      );
+      const activeCount = parseInt(activeCountRes.rows[0].count, 10);
+      if (activeCount >= 3) {
+        return res.json({ success: false, message: 'You already have 3 active goals. Complete or pause another goal before resuming this one.' });
+      }
+    }
+
     const result = await pool.query(
       `UPDATE goals SET status = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2 AND user_id = $3 AND status = 'active'
+       WHERE id = $2 AND user_id = $3
        RETURNING *`,
       [status, id, userId]
     );
-    if (result.rows.length === 0)
-      return res.json({ success: false, message: 'Goal not found or is not active.' });
+
     res.json({ success: true, goal: result.rows[0] });
   } catch (err) {
     console.error(err);
@@ -396,9 +519,9 @@ app.get('/api/journey/map', async (req, res) => {
   try {
     const userId = req.session.user.id;
 
-    // 1. Fetch active goal
+    // 1. Fetch active goal (deterministic latest active goal)
     const goalRes = await pool.query(
-      `SELECT * FROM goals WHERE user_id = $1 AND status = 'active' LIMIT 1`,
+      `SELECT * FROM goals WHERE user_id = $1 AND status = 'active' ORDER BY created_at DESC LIMIT 1`,
       [userId]
     );
 
@@ -533,9 +656,9 @@ app.get('/api/progress/analytics', async (req, res) => {
   try {
     const userId = req.session.user.id;
 
-    // 1. Fetch active goal
+    // 1. Fetch active goal (deterministic latest active goal)
     const goalRes = await pool.query(
-      `SELECT * FROM goals WHERE user_id = $1 AND status = 'active' LIMIT 1`,
+      `SELECT * FROM goals WHERE user_id = $1 AND status = 'active' ORDER BY created_at DESC LIMIT 1`,
       [userId]
     );
 
@@ -611,7 +734,7 @@ app.get('/api/progress/analytics', async (req, res) => {
     let weeklyRate = 0;
     let requiredRate = 0;
     let onTrack = false;
-    
+
     let forecastStatus = 'insufficient'; // 'ahead' | 'ontrack' | 'behind' | 'insufficient'
     let forecastLabel = 'Insufficient Data';
     let estimatedDate = 'N/A';
@@ -640,7 +763,7 @@ app.get('/api/progress/analytics', async (req, res) => {
         weeklyRate = Math.round((weightDiff / dateDiffDays * 7) * 100) / 100;
 
         const weightRemaining = Math.abs(currentWeight - tw);
-        
+
         if (daysRemaining > 0) {
           requiredRate = Math.round((weightRemaining / daysRemaining * 7) * 100) / 100;
         }
@@ -976,9 +1099,9 @@ app.get('/api/healthscore', async (req, res) => {
     const userId = req.session.user.id;
     const todayStr = getLocalDateString(new Date());
 
-    // 1. Fetch active goal
+    // 1. Fetch active goal (deterministic latest active goal)
     const goalRes = await pool.query(
-      `SELECT * FROM goals WHERE user_id = $1 AND status = 'active' LIMIT 1`,
+      `SELECT * FROM goals WHERE user_id = $1 AND status = 'active' ORDER BY created_at DESC LIMIT 1`,
       [userId]
     );
     const activeGoal = goalRes.rows.length > 0 ? goalRes.rows[0] : null;
@@ -1057,11 +1180,11 @@ app.get('/api/healthscore', async (req, res) => {
 
     if (activeGoal) {
       goalTargetText = `${activeGoal.target_weight} kg`;
-      
+
       if (activeGoal.goal_type === 'maintenance') {
         const deviation = Math.abs(currentWeight - tw);
         goalValueText = `${currentWeight.toFixed(1)} kg`;
-        
+
         if (deviation <= 2) {
           goalScore = 100;
           goalExplanation = `Your current weight (${currentWeight.toFixed(1)} kg) is within your stability target zone (+/- 2 kg of ${tw} kg). Excellent maintenance control!`;
@@ -1074,24 +1197,24 @@ app.get('/api/healthscore', async (req, res) => {
         // Retrieve schedule variance from velocity calculation logic
         const startDate = new Date(activeGoal.start_date);
         const targetDate = new Date(activeGoal.target_date);
-        const today = new Date(); today.setHours(0,0,0,0);
-        
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+
         const daysRemaining = Math.max(0, Math.round((targetDate - today) / (1000 * 60 * 60 * 24)));
         const weightLogsCount = weightHistory.length;
-        
+
         let weeklyRate = 0;
         let isMovingTowardsGoal = false;
         let rateTowardsGoal = 0;
-        
+
         if (weightLogsCount >= 2) {
           const earliest = weightHistory[0];
           const latest = weightHistory[weightLogsCount - 1];
           const dateDiffDays = Math.round((new Date(latest.log_date) - new Date(earliest.log_date)) / (1000 * 60 * 60 * 24));
-          
+
           if (dateDiffDays >= 3) {
             const weightDiff = latest.weight - earliest.weight;
             weeklyRate = Math.round((weightDiff / dateDiffDays * 7) * 100) / 100;
-            
+
             if (activeGoal.goal_type === 'weight_loss' && weeklyRate < 0) {
               isMovingTowardsGoal = true;
               rateTowardsGoal = -weeklyRate;
@@ -1101,14 +1224,14 @@ app.get('/api/healthscore', async (req, res) => {
             }
           }
         }
-        
+
         if (isMovingTowardsGoal && rateTowardsGoal > 0) {
           const weightRemaining = Math.abs(currentWeight - tw);
           const estDaysRemaining = Math.ceil(weightRemaining / (rateTowardsGoal / 7));
           const daysDifference = daysRemaining - estDaysRemaining;
-          
+
           goalValueText = daysDifference > 0 ? `${daysDifference} days ahead` : `${Math.abs(daysDifference)} days behind`;
-          
+
           if (daysDifference >= -3) {
             goalScore = 100;
             goalExplanation = `Your weight velocity (${Math.abs(weeklyRate).toFixed(2)} kg/week) is on track. Projected to hit target weight ${daysDifference > 0 ? daysDifference + ' days ahead' : 'close to'} schedule.`;
@@ -1135,15 +1258,15 @@ app.get('/api/healthscore', async (req, res) => {
     let activityScore = 0;
     const stepsLogged = todayLog ? parseInt(todayLog.steps_count || 0, 10) : 0;
     const durationLogged = todayLog ? parseInt(todayLog.workout_duration_mins || 0, 10) : 0;
-    
+
     const stepsPart = Math.min(100, (stepsLogged / 10000) * 100);
     const durationPart = Math.min(100, (durationLogged / 30) * 100);
     activityScore = Math.round(0.60 * stepsPart + 0.40 * durationPart);
-    
+
     const activityValueText = `${stepsLogged.toLocaleString()} steps, ${durationLogged} mins`;
     const activityTargetText = '10,000 steps, 30 mins';
     let activityExplanation = `You walked ${stepsLogged.toLocaleString()} steps (target: 10,000) and completed ${durationLogged} minutes of active exercise (target: 30) today.`;
-    
+
     if (stepsLogged === 0 && durationLogged === 0) {
       activityExplanation = 'No movement logged today. Complete a workout or log steps in your check-in to unlock daily activity points.';
     }
@@ -1165,7 +1288,7 @@ app.get('/api/healthscore', async (req, res) => {
     const hydrationValueText = `${waterL} L`;
     const hydrationTargetText = '3.0 L';
     let hydrationExplanation = `You logged ${waterL} L of water today (target: 3.0 L). Proper hydration is essential for cellular recovery and physical energy.`;
-    
+
     if (waterL === 0) {
       hydrationExplanation = 'No hydration logged today. Log water cups in your check-in to unlock points and keep metabolism primed.';
     }
@@ -1176,12 +1299,12 @@ app.get('/api/healthscore', async (req, res) => {
     const energyVal = todayLog ? todayLog.energy_level : null;
     const finalEnergy = energyVal !== null ? energyVal : avgEnergy;
     const energyScore = Math.round((finalEnergy / 5) * 100);
-    
+
     const energyLabels = { 1: 'Exhausted', 2: 'Tired', 3: 'Normal', 4: 'Energetic', 5: 'Peak' };
     const energyValueText = energyVal !== null ? `${energyVal}/5 (${energyLabels[energyVal]})` : `${finalEnergy.toFixed(1)}/5 (Avg)`;
     const energyTargetText = '5/5 (Peak)';
     let energyExplanation = `Your subjective energy level is rated as ${energyLabels[Math.round(finalEnergy)]} (${finalEnergy.toFixed(1)}/5) today.`;
-    
+
     if (energyVal === null) {
       energyExplanation = `No check-in rating logged today; falling back to 30-day average energy level (${finalEnergy.toFixed(1)}/5).`;
     }
@@ -1217,7 +1340,7 @@ app.get('/api/healthscore', async (req, res) => {
     // DETERMINISTIC ACTION SUGGESTIONS & POINTS CALCULATION
     // ─────────────────────────────────────────────────────────────────
     const tips = [];
-    
+
     if (stepsPart < 100) {
       const stepsRem = 10000 - stepsLogged;
       const stepPts = Math.round((0.20 * 0.60 * (stepsRem / 10000) * 100) * 10) / 10;
@@ -1225,7 +1348,7 @@ app.get('/api/healthscore', async (req, res) => {
         tips.push({ tip: `Walk ${stepsRem.toLocaleString()} more steps today`, points: stepPts });
       }
     }
-    
+
     if (durationPart < 100) {
       const durRem = 30 - durationLogged;
       const durPts = Math.round((0.20 * 0.40 * (durRem / 30) * 100) * 10) / 10;
@@ -1233,12 +1356,12 @@ app.get('/api/healthscore', async (req, res) => {
         tips.push({ tip: `Exercise for ${durRem} more minutes today`, points: durPts });
       }
     }
-    
+
     if (completedWorkoutsThisWeek < 3) {
       const consistencyPts = Math.round((0.20 * (1 / 3) * 100) * 10) / 10;
       tips.push({ tip: `Complete your next workout session this week`, points: consistencyPts });
     }
-    
+
     if (waterL < 3.0) {
       const waterRem = parseFloat((3.0 - waterL).toFixed(1));
       const waterPts = Math.round((0.15 * (waterRem / 3.0) * 100) * 10) / 10;
@@ -1246,12 +1369,12 @@ app.get('/api/healthscore', async (req, res) => {
         tips.push({ tip: `Drink ${waterRem} L more water today`, points: waterPts });
       }
     }
-    
+
     if (currentStreak < 7) {
       const streakPts = Math.round((0.15 * (1 / 7) * 100) * 10) / 10;
       tips.push({ tip: `Log check-in tomorrow to advance streak`, points: streakPts });
     }
-    
+
     if (!activeGoal) {
       tips.push({ tip: `Set an active fitness or weight goal`, points: 10.0 });
     }
@@ -1322,9 +1445,9 @@ app.get('/api/recommendations', async (req, res) => {
     const userId = req.session.user.id;
     const todayStr = getLocalDateString(new Date());
 
-    // 1. Fetch active goal
+    // 1. Fetch active goal (deterministic latest active goal)
     const goalRes = await pool.query(
-      `SELECT * FROM goals WHERE user_id = $1 AND status = 'active' LIMIT 1`,
+      `SELECT * FROM goals WHERE user_id = $1 AND status = 'active' ORDER BY created_at DESC LIMIT 1`,
       [userId]
     );
     const activeGoal = goalRes.rows.length > 0 ? goalRes.rows[0] : null;
@@ -1402,13 +1525,13 @@ app.get('/api/recommendations', async (req, res) => {
         else goalScore = Math.max(0, Math.round(100 - (deviation - 2) * 10));
       } else {
         const targetDate = new Date(activeGoal.target_date);
-        const today = new Date(); today.setHours(0,0,0,0);
+        const today = new Date(); today.setHours(0, 0, 0, 0);
         const daysRemaining = Math.max(0, Math.round((targetDate - today) / (1000 * 60 * 60 * 24)));
         const weightLogsCount = weightHistory.length;
         let weeklyRate = 0;
         let isMovingTowardsGoal = false;
         let rateTowardsGoal = 0;
-        
+
         if (weightLogsCount >= 2) {
           const earliest = weightHistory[0];
           const latest = weightHistory[weightLogsCount - 1];
@@ -1539,13 +1662,13 @@ app.get('/api/recommendations', async (req, res) => {
       } else {
         const startDate = new Date(activeGoal.start_date);
         const targetDate = new Date(activeGoal.target_date);
-        const today = new Date(); today.setHours(0,0,0,0);
+        const today = new Date(); today.setHours(0, 0, 0, 0);
         const daysRemaining = Math.max(0, Math.round((targetDate - today) / (1000 * 60 * 60 * 24)));
         const weightLogsCount = weightHistory.length;
         let weeklyRate = 0;
         let isMovingTowardsGoal = false;
         let rateTowardsGoal = 0;
-        
+
         if (weightLogsCount >= 2) {
           const earliest = weightHistory[0];
           const latest = weightHistory[weightLogsCount - 1];
@@ -1567,7 +1690,7 @@ app.get('/api/recommendations', async (req, res) => {
           const weightRemaining = Math.abs(currentWeight - tw);
           const estDaysRemaining = Math.ceil(weightRemaining / (rateTowardsGoal / 7));
           const daysDifference = daysRemaining - estDaysRemaining;
-          
+
           if (daysDifference >= -3) {
             if (daysDifference > 15 && rateTowardsGoal > 1.5 && activeGoal.goal_type === 'weight_loss') {
               recommendations.push({
@@ -1601,8 +1724,8 @@ app.get('/api/recommendations', async (req, res) => {
             category: 'goal_progress',
             priority: 'medium',
             title: activeGoal.goal_type === 'weight_loss' ? 'Accelerate Weight Loss Progress' : 'Accelerate Muscle Gain Progress',
-            description: weightLogsCount < 2 
-              ? 'Insufficient logs to determine schedule velocity. Log weight at least twice over a 3-day window.' 
+            description: weightLogsCount < 2
+              ? 'Insufficient logs to determine schedule velocity. Log weight at least twice over a 3-day window.'
               : `Your weight trend (${weeklyRate > 0 ? '+' : ''}${weeklyRate} kg/week) is stable or moving away from your goal parameters.`,
             expectedBenefit: 'Re-aligns metabolic output to resume weight trajectory towards goal.'
           });
@@ -1616,7 +1739,7 @@ app.get('/api/recommendations', async (req, res) => {
           category: 'activity',
           priority: 'high',
           title: 'Activate Daily Movement',
-          description: stepsLogged === 0 
+          description: stepsLogged === 0
             ? 'No steps logged today. Start walking to build cardiovascular momentum.'
             : `You have only logged ${stepsLogged.toLocaleString()} steps today. Walk ${stepsRem.toLocaleString()} more steps to hit your daily goal.`,
           expectedBenefit: 'Triggers active calorie burn, boosts circulation, and increases activity score component.'
@@ -1786,9 +1909,9 @@ app.get('/api/coach', async (req, res) => {
     const userId = req.session.user.id;
     const todayStr = getLocalDateString(new Date());
 
-    // 1. Fetch active goal
+    // 1. Fetch active goal (deterministic latest active goal)
     const goalRes = await pool.query(
-      `SELECT * FROM goals WHERE user_id = $1 AND status = 'active' LIMIT 1`,
+      `SELECT * FROM goals WHERE user_id = $1 AND status = 'active' ORDER BY created_at DESC LIMIT 1`,
       [userId]
     );
     const activeGoal = goalRes.rows.length > 0 ? goalRes.rows[0] : null;
@@ -1844,6 +1967,27 @@ app.get('/api/coach', async (req, res) => {
       weight: parseFloat(row.weight)
     }));
 
+    // Fetch 30-day logs with behavioral metrics for personalized recommendations
+    const fullLogsRes = await pool.query(
+      `SELECT log_date::text, weight, steps_count, workout_completed,
+              workout_duration_mins, water_intake_ml, energy_level
+       FROM progress_logs
+       WHERE user_id = $1 AND log_date >= CURRENT_DATE - INTERVAL '29 days'
+       ORDER BY log_date ASC`,
+      [userId]
+    );
+
+    let personalizedRec = null;
+    try {
+      personalizedRec = generatePersonalizedRecommendations({
+        activeGoal,
+        recentLogs: fullLogsRes.rows,
+        asOfDate: todayStr,
+      });
+    } catch (e) {
+      console.error('Coach personalized rec error:', e);
+    }
+
     // 7. Fetch latest weight
     const latestWeightRes = await pool.query(
       `SELECT weight FROM progress_logs
@@ -1872,10 +2016,10 @@ app.get('/api/coach', async (req, res) => {
         else goalScore = Math.max(0, Math.round(100 - (deviation - 2) * 10));
       } else {
         const targetDate = new Date(activeGoal.target_date);
-        const today = new Date(); today.setHours(0,0,0,0);
+        const today = new Date(); today.setHours(0, 0, 0, 0);
         const daysRemaining = Math.max(0, Math.round((targetDate - today) / (1000 * 60 * 60 * 24)));
         const weightLogsCount = weightHistory.length;
-        
+
         if (weightLogsCount >= 2) {
           const earliest = weightHistory[0];
           const latest = weightHistory[weightLogsCount - 1];
@@ -2011,13 +2155,13 @@ app.get('/api/coach', async (req, res) => {
       } else {
         const startDate = new Date(activeGoal.start_date);
         const targetDate = new Date(activeGoal.target_date);
-        const today = new Date(); today.setHours(0,0,0,0);
+        const today = new Date(); today.setHours(0, 0, 0, 0);
         const daysRemaining = Math.max(0, Math.round((targetDate - today) / (1000 * 60 * 60 * 24)));
         const weightLogsCount = weightHistory.length;
         let weeklyRate = 0;
         let isMovingTowardsGoal = false;
         let rateTowardsGoal = 0;
-        
+
         if (weightLogsCount >= 2) {
           const earliest = weightHistory[0];
           const latest = weightHistory[weightLogsCount - 1];
@@ -2039,7 +2183,7 @@ app.get('/api/coach', async (req, res) => {
           const weightRemaining = Math.abs(currentWeight - tw);
           const estDaysRemaining = Math.ceil(weightRemaining / (rateTowardsGoal / 7));
           const daysDifference = daysRemaining - estDaysRemaining;
-          
+
           if (daysDifference >= -3) {
             if (daysDifference > 15 && rateTowardsGoal > 1.5 && activeGoal.goal_type === 'weight_loss') {
               recommendations.push({
@@ -2073,8 +2217,8 @@ app.get('/api/coach', async (req, res) => {
             category: 'goal_progress',
             priority: 'medium',
             title: activeGoal.goal_type === 'weight_loss' ? 'Accelerate Weight Loss Progress' : 'Accelerate Muscle Gain Progress',
-            description: weightLogsCount < 2 
-              ? 'Insufficient logs to determine schedule velocity. Log weight at least twice over a 3-day window.' 
+            description: weightLogsCount < 2
+              ? 'Insufficient logs to determine schedule velocity. Log weight at least twice over a 3-day window.'
               : `Your weight trend (${weeklyRate > 0 ? '+' : ''}${weeklyRate} kg/week) is stable or moving away from your goal parameters.`,
             expectedBenefit: 'Re-aligns metabolic output to resume weight trajectory towards goal.'
           });
@@ -2088,7 +2232,7 @@ app.get('/api/coach', async (req, res) => {
           category: 'activity',
           priority: 'high',
           title: 'Activate Daily Movement',
-          description: stepsLogged === 0 
+          description: stepsLogged === 0
             ? 'No steps logged today. Start walking to build cardiovascular momentum.'
             : `You have only logged ${stepsLogged.toLocaleString()} steps today. Walk ${stepsRem.toLocaleString()} more steps to hit your daily goal.`,
           expectedBenefit: 'Triggers active calorie burn, boosts circulation, and increases activity score component.'
@@ -2365,7 +2509,12 @@ Focus on addressing daily hydration and step deficits to trigger immediate posit
       answers.weekly_focus = 'Your main focus this week is establishing consistent daily habit patterns:\n\n1. Set an active goal parameters (Weight Loss / Muscle Gain / Maintenance).\n2. Complete at least 3 check-ins to initialize streak tracking.\n3. Establish baseline step movements of 6,000+ steps daily.';
     } else {
       const top3 = recommendations.slice(0, 3);
-      answers.weekly_focus = `Based on your telemetry, here are your top 3 actionable tasks to focus on this week:
+      let persBlock = '';
+      if (personalizedRec && personalizedRec.status === 'ok' && personalizedRec.primary) {
+        persBlock = `🎯 **Personalized Trajectory Focus:**\n**${personalizedRec.primary.title}**\n*Action*: ${personalizedRec.primary.action}\n*Reason*: ${personalizedRec.primary.reason}\n\n`;
+      }
+
+      answers.weekly_focus = `${persBlock}Based on your telemetry, here are your top actionable tasks to focus on this week:
 
 ${top3.map((rec, i) => `${i + 1}.  **${rec.title}** (${categoryLabels[rec.category] || rec.category})
     *   *Action*: ${rec.description}
@@ -2375,6 +2524,12 @@ ${top3.map((rec, i) => `${i + 1}.  **${rec.title}** (${categoryLabels[rec.catego
     // 4. Why am I receiving this recommendation?
     if (isNewUser) {
       answers.why_recommendations = 'You are receiving onboarding recommendations because your account is brand new. Once you set a goal and submit check-ins, recommendations will update dynamically based on your physical telemetry.';
+    } else if (personalizedRec && personalizedRec.status === 'ok' && personalizedRec.primary) {
+      answers.why_recommendations = `Based on your unified trajectory intelligence, your primary focus is **"${personalizedRec.primary.title}"**.
+*Reason:* ${personalizedRec.primary.reason}
+*Action:* ${personalizedRec.primary.action}
+
+Additionally, the telemetry engine flags **"${topRec ? topRec.title : 'Active Habits'}"** to guide your health journey route safely.`;
     } else if (topRec) {
       let triggerReason = 'your wellness parameters are under evaluation';
       const energyLabels = { 1: 'Exhausted', 2: 'Tired', 3: 'Normal', 4: 'Energetic', 5: 'Peak' };
@@ -2454,6 +2609,159 @@ Focus on completing these actions to secure immediate score improvements.`;
 });
 
 
+
+// ─── Progress Signals: Statistical Time-Series Notes (Capability 3) ───────────
+app.get('/api/progress/signals', async (req, res) => {
+  if (!req.session.user)
+    return res.json({ success: false, message: 'Not logged in.' });
+
+  try {
+    const userId = req.session.user.id;
+
+    // 1. Fetch active goal (deterministic latest active goal)
+    const goalRes = await pool.query(
+      `SELECT * FROM goals WHERE user_id = $1 AND status = 'active' ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+    const activeGoal = goalRes.rows.length > 0 ? goalRes.rows[0] : null;
+
+    // 2. Fetch 30-day progress logs with behavioral metrics
+    const logsRes = await pool.query(
+      `SELECT log_date::text, weight, steps_count, workout_completed,
+              workout_duration_mins, water_intake_ml, energy_level
+       FROM progress_logs
+       WHERE user_id = $1 AND log_date >= CURRENT_DATE - INTERVAL '29 days'
+       ORDER BY log_date ASC`,
+      [userId]
+    );
+
+    // 3. Run statistical time-series intelligence
+    const todayStr = getLocalDateString(new Date());
+    const analysis = analyzeProgressSignals(logsRes.rows, activeGoal, todayStr);
+
+    res.json({
+      success: true,
+      activeGoal: activeGoal
+        ? {
+          id: activeGoal.id,
+          goal_type: activeGoal.goal_type,
+          target_weight: activeGoal.target_weight
+        }
+        : null,
+      ...analysis
+    });
+  } catch (err) {
+    console.error(err);
+    res.json({ success: false, message: 'Server error. Please try again.' });
+  }
+});
+
+// ─── Capability 2: Goal Achievement Prediction Endpoint ────────────
+async function handleGoalAchievementRequest(req, res) {
+  if (!req.session.user)
+    return res.json({ success: false, message: 'Not logged in.' });
+
+  try {
+    const userId = req.session.user.id;
+
+    // 1. Fetch active goal (deterministic latest active goal)
+    const goalRes = await pool.query(
+      `SELECT * FROM goals WHERE user_id = $1 AND status = 'active' ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+    const activeGoal = goalRes.rows.length > 0 ? goalRes.rows[0] : null;
+
+    // 2. Fetch 30-day progress logs with behavioral metrics
+    const logsRes = await pool.query(
+      `SELECT log_date::text, weight, steps_count, workout_completed,
+              workout_duration_mins, water_intake_ml, energy_level
+       FROM progress_logs
+       WHERE user_id = $1 AND log_date >= CURRENT_DATE - INTERVAL '29 days'
+       ORDER BY log_date ASC`,
+      [userId]
+    );
+
+    // 3. Run goal achievement trajectory prediction
+    const todayStr = getLocalDateString(new Date());
+    const prediction = predictGoalAchievement(logsRes.rows, activeGoal, todayStr);
+
+    res.json({
+      success: true,
+      activeGoal: activeGoal
+        ? {
+          id: activeGoal.id,
+          goal_name: activeGoal.goal_name,
+          goal_type: activeGoal.goal_type,
+          start_weight: activeGoal.start_weight,
+          target_weight: activeGoal.target_weight,
+          target_date: activeGoal.target_date,
+        }
+        : null,
+      ...prediction,
+    });
+  } catch (err) {
+    console.error('Goal achievement calculation error:', err);
+    res.json({ success: false, message: 'Server error. Please try again.' });
+  }
+}
+
+app.get('/api/goals/achievement', handleGoalAchievementRequest);
+app.get('/api/goal-achievement', handleGoalAchievementRequest);
+
+// ─── Capability 4: Personalized Recommendations Endpoint ──────────
+async function handlePersonalizedRecommendationsRequest(req, res) {
+  if (!req.session.user)
+    return res.json({ success: false, message: 'Not logged in.' });
+
+  try {
+    const userId = req.session.user.id;
+    const todayStr = getLocalDateString(new Date());
+
+    // 1. Fetch active goal (deterministic latest active goal)
+    const goalRes = await pool.query(
+      `SELECT * FROM goals WHERE user_id = $1 AND status = 'active' ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+    const activeGoal = goalRes.rows.length > 0 ? goalRes.rows[0] : null;
+
+    // 2. Fetch 30-day progress logs with behavioral metrics
+    const logsRes = await pool.query(
+      `SELECT log_date::text, weight, steps_count, workout_completed,
+              workout_duration_mins, water_intake_ml, energy_level
+       FROM progress_logs
+       WHERE user_id = $1 AND log_date >= CURRENT_DATE - INTERVAL '29 days'
+       ORDER BY log_date ASC`,
+      [userId]
+    );
+
+    // 3. Generate personalized recommendations combining all capabilities
+    const recommendations = generatePersonalizedRecommendations({
+      activeGoal,
+      recentLogs: logsRes.rows,
+      asOfDate: todayStr,
+    });
+
+    res.json({
+      success: true,
+      activeGoal: activeGoal
+        ? {
+          id: activeGoal.id,
+          goal_name: activeGoal.goal_name,
+          goal_type: activeGoal.goal_type,
+          start_weight: activeGoal.start_weight,
+          target_weight: activeGoal.target_weight,
+          target_date: activeGoal.target_date,
+        }
+        : null,
+      ...recommendations,
+    });
+  } catch (err) {
+    console.error('Personalized recommendations calculation error:', err);
+    res.json({ success: false, message: 'Server error. Please try again.' });
+  }
+}
+
+app.get('/api/recommendations/personalized', handlePersonalizedRecommendationsRequest);
 
 // ─── Serve SPA ────────────────────────────────────────────────────
 app.get('*', (req, res) => {

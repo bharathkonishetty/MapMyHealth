@@ -154,6 +154,21 @@ async function runMigration() {
       }
     }
 
+    // Ensure goals_status_check constraint allows 'paused'
+    const goalsTableExistsRes = await client.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'goals'
+      );
+    `);
+    if (goalsTableExistsRes.rows[0].exists) {
+      await client.query(`
+        ALTER TABLE goals DROP CONSTRAINT IF EXISTS goals_status_check;
+        ALTER TABLE goals ADD CONSTRAINT goals_status_check CHECK (status IN ('active', 'completed', 'paused', 'cancelled'));
+      `);
+      console.log('Updated goals_status_check constraint to include paused.');
+    }
+
     console.log('Migration execution completed successfully.');
 
   } catch (err) {

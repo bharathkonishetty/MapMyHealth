@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS goals (
     target_protein_g INTEGER CHECK (target_protein_g >= 0),
     target_carbs_g INTEGER CHECK (target_carbs_g >= 0),
     target_fats_g INTEGER CHECK (target_fats_g >= 0),
-    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'paused', 'cancelled')),
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
