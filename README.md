@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="screenshots/banner.png" alt="MapMyHealth Banner" width="900">
+  <img src="screenshots/Banner.png" alt="MapMyHealth Banner" width="900">
 </p>
 
 <h1 align="center">🏥 MapMyHealth</h1>
@@ -25,28 +25,28 @@ Full-Stack Health Tracking & Analytics Platform
 ## 📸 Application Screenshots
 
 ### 🏠 Dashboard
-![Dashboard](screenshots/dashboard.png)
+![Dashboard](screenshots/Dashboard.png)
 
 ### 🎯 Goals
-![Goals](screenshots/goals.png)
+![Goals](screenshots/Goals.png)
 
 ### 🗺️ Journey Map
-![Journey Map](screenshots/journey-map.png)
+![Journey Map](screenshots/Journey.png)
 
 ### 📊 Analytics
-![Analytics](screenshots/analytics.png)
+![Analytics](screenshots/Analytics.png)
 
 ### 📝 Daily Check-In
-![Daily Check-In](screenshots/checkin.png)
+![Daily Check-In](screenshots/Check-in.png)
 
 ### ❤️ Health Score
-![Health Score](screenshots/health-score.png)
+![Health Score](screenshots/Health-score.png)
 
 ### 💡 Recommendations
-![Recommendations](screenshots/recommendations.png)
+![Recommendations](screenshots/Recommendations.png)
 
 ### 🤖 AI Coach
-![AI Coach](screenshots/ai-coach.png)
+![AI Coach](screenshots/AI-coach.png)
 
 # Tech Stack
 
